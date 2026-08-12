@@ -1,0 +1,48 @@
+{
+  "_comment": "Copy this to training_plan.json and fill in your own plan. That file is git-ignored so your personal details never get committed. All fields are free-form context for the coach — add or remove keys as you like.",
+  "athlete": {
+    "name": "Your Name",
+    "ftp_watts": 250,
+    "weight_lb": "170",
+    "resting_hr": 50,
+    "threshold_hr": "160",
+    "context": "A sentence or two of background the coach should know: your history, current focus, and limiters."
+  },
+  "zones_at_ftp_250": {
+    "z2_watts": "140-188",
+    "z3_watts": "189-225",
+    "z4_interval_watts": "226-263",
+    "z5_watts": "264-300",
+    "z2_hr_target": "115-130"
+  },
+  "philosophy": {
+    "priority": "What matters most and why (e.g. which sport or goal leads).",
+    "emphasis": "The current training emphasis.",
+    "structure": "How you structure hard vs. easy days (e.g. polarized).",
+    "known_patterns": [
+      "Any personal patterns the coach should watch for (e.g. power drifts up late in rides)."
+    ]
+  },
+  "season_goals": {
+    "near_term": ["A goal or two for the next month."],
+    "longer_term": { "target": "A longer-range target and rough date." }
+  },
+  "current_block": {
+    "name": "Name of your current training block",
+    "focus": "What this block is working on, and roughly when."
+  },
+  "weekly_template": {
+    "note": "The general shape of your week and how it flexes.",
+    "monday": "e.g. Threshold intervals",
+    "tuesday": "e.g. Easy Z2",
+    "wednesday": "e.g. Long run or easy ride",
+    "thursday": "e.g. Easy Z2",
+    "friday": "e.g. Rest or shakeout",
+    "saturday": "e.g. Long endurance ride",
+    "sunday": "e.g. Rest"
+  },
+  "fueling": {
+    "on_bike_carbs_g_per_hr": "e.g. 60-90",
+    "notes": "Any fueling approach the coach should factor in."
+  }
+}

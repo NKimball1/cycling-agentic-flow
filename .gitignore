@@ -1,0 +1,26 @@
+# Secrets
+.env
+.strava_tokens.json
+
+# Local sync state
+.synced_ids.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Generated analyses
+output/
+
+# Personal data — NEVER commit (contains health info, training details, etc.).
+# The *.example.json templates are committed instead, to document the schema.
+data/training_plan.json
+data/recent_activities.json
+
+# Your exported ride files
+data/*.fit
+
+# Local Claude Code settings (machine-specific)
+.claude/settings.local.json

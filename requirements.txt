@@ -1,0 +1,14 @@
+# Anthropic Python SDK — talks to Claude, including tool use / function calling.
+anthropic>=0.40
+
+# Parses Garmin/Strava .fit binary files into Python objects.
+fitparse>=1.2.0
+
+# Loads ANTHROPIC_API_KEY and your FTP from a local .env file.
+python-dotenv>=1.0.0
+
+# HTTP client for the Strava API (Phase 2).
+requests>=2.31
+
+# Render the Markdown analysis as HTML for email delivery (Phase 3).
+markdown>=3.5

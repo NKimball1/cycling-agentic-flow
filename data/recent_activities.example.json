@@ -1,0 +1,42 @@
+[
+  {
+    "date": "2026-01-05",
+    "name": "Sunday Long Ride",
+    "type": "Long Endurance",
+    "sport": "cycling",
+    "moving_duration_min": 180,
+    "distance_mi": 48.0,
+    "avg_power_w": 175,
+    "normalized_power_w": 190,
+    "intensity_factor": 0.76,
+    "load_tss": 165,
+    "avg_hr_bpm": 140,
+    "elevation_gain_ft": 2200,
+    "note": "Steady Z2 base ride, good execution, minimal decoupling."
+  },
+  {
+    "date": "2026-01-03",
+    "name": "Threshold 2x20",
+    "type": "Threshold",
+    "sport": "cycling",
+    "moving_duration_min": 75,
+    "avg_power_w": 205,
+    "normalized_power_w": 220,
+    "intensity_factor": 0.88,
+    "load_tss": 95,
+    "avg_hr_bpm": 155,
+    "note": "Two 20-minute intervals near threshold; second interval held well."
+  },
+  {
+    "date": "2026-01-02",
+    "name": "Easy Run",
+    "type": "Run - Easy",
+    "sport": "running",
+    "moving_duration_min": 40,
+    "distance_mi": 4.0,
+    "avg_pace_min_per_mi": 10.0,
+    "load_tss": 45,
+    "avg_hr_bpm": 135,
+    "note": "Easy aerobic run, conversational pace."
+  }
+]
