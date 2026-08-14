@@ -20,9 +20,12 @@ provider-agnostic: it never imports a vendor SDK.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import time
 from datetime import datetime
 
+import runlog
 from llm import get_llm_client
 from plan_loader import get_training_plan, get_recent_activities, append_activity
 
@@ -98,6 +101,11 @@ After writing the analysis, call the `log_activity` tool exactly once to record 
 this activity in the athlete's history, including a short coach note in the \
 style of a training log. Calling the tool is your final action — do not write \
 any text after it."""
+
+# A short hash of the system prompt. Any prompt change yields a new version tag,
+# so runs and eval scores can be grouped by exactly which prompt produced them —
+# that's what makes "did this change help?" answerable.
+PROMPT_VERSION = hashlib.sha256(SYSTEM_PROMPT.encode("utf-8")).hexdigest()[:8]
 
 # The one tool: a typed, validated boundary for the history write.
 LOG_ACTIVITY_TOOL = {
@@ -198,11 +206,12 @@ def run_analysis(activity: dict, verbose: bool = True, dry_run: bool = False) ->
             print(f"  Logged to history: {result}")
         return result
 
-    # The provider seam runs the tool-use loop and returns the final analysis.
-    # log_activity is a terminal side effect (record and done), so we stop as
-    # soon as it runs — no wasted follow-up turn, no post-tool "Logged." text.
+    # The provider seam runs the tool-use loop and returns the analysis + token
+    # telemetry. log_activity is a terminal side effect (record and done), so we
+    # stop as soon as it runs — no wasted follow-up turn, no post-tool text.
     client = get_llm_client()
-    return client.run_tool_loop(
+    started = time.monotonic()
+    result = client.run_tool_loop(
         system=SYSTEM_PROMPT,
         user_message=user_message,
         tools=[LOG_ACTIVITY_TOOL],
@@ -210,3 +219,19 @@ def run_analysis(activity: dict, verbose: bool = True, dry_run: bool = False) ->
         verbose=verbose,
         tools_are_terminal=True,
     )
+    latency_s = round(time.monotonic() - started, 2)
+
+    # Observability: record this run. Logging must never break the analysis.
+    try:
+        runlog.log_run(activity, result, latency_s, dry_run, PROMPT_VERSION)
+    except Exception as exc:  # pragma: no cover
+        if verbose:
+            print(f"  (run-log failed: {exc})")
+
+    if verbose:
+        print(
+            f"  {result.input_tokens} in + {result.output_tokens} out tokens, "
+            f"{latency_s}s"
+        )
+
+    return result.text

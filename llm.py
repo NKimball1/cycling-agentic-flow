@@ -15,6 +15,7 @@ translation — not text generation — is the real work in any future adapter.
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from typing import Callable, Protocol
 
 import anthropic
@@ -23,6 +24,22 @@ import config
 
 # A tool executor runs a requested tool and returns a JSON-serializable result.
 ToolExecutor = Callable[[str, dict], dict]
+
+
+@dataclass
+class LLMResult:
+    """What an LLM call produced: the text, plus telemetry (tokens, model).
+
+    Returning this instead of a bare string is what makes observability possible
+    — the caller can log token cost and which model ran, without the seam
+    leaking any vendor-specific response object. Any future adapter fills the
+    same fields from its own provider's usage data.
+    """
+
+    text: str
+    input_tokens: int = 0
+    output_tokens: int = 0
+    model: str = ""
 
 
 class LLMClient(Protocol):
@@ -36,14 +53,19 @@ class LLMClient(Protocol):
         tool_executor: ToolExecutor,
         verbose: bool = True,
         tools_are_terminal: bool = False,
-    ) -> str:
+    ) -> LLMResult:
         """Send the request, execute any tool calls via `tool_executor`, and
-        return the model's text. `tools` are neutral specs (see module docstring);
-        the adapter translates them for its provider.
+        return the model's text plus token telemetry. `tools` are neutral specs
+        (see module docstring); the adapter translates them for its provider.
 
         If `tools_are_terminal` is True, the tools are fire-and-forget side
         effects: once executed, the loop stops without a follow-up model turn.
         That avoids a wasted round-trip and any post-tool acknowledgment text."""
+        ...
+
+    def complete(self, system: str, user_message: str) -> LLMResult:
+        """A plain text completion — no tools. Used by the eval judge, and handy
+        for any single-shot generation. Same telemetry as run_tool_loop."""
         ...
 
 
@@ -75,10 +97,11 @@ class ClaudeClient:
         tool_executor: ToolExecutor,
         verbose: bool = True,
         tools_are_terminal: bool = False,
-    ) -> str:
+    ) -> LLMResult:
         anthropic_tools = self._to_anthropic_tools(tools)
         messages = [{"role": "user", "content": user_message}]
         text_parts: list[str] = []
+        total_in = total_out = 0  # accumulate token usage across turns
 
         # Minimal tool-use loop: model writes text and/or requests tools; we run
         # the tools and feed results back until it stops asking. (Cap as backstop.)
@@ -90,9 +113,15 @@ class ClaudeClient:
                 tools=anthropic_tools,
                 messages=messages,
             )
+            if response.usage:
+                total_in += response.usage.input_tokens or 0
+                total_out += response.usage.output_tokens or 0
 
             if response.stop_reason == "refusal":
-                return "The model declined to respond to this request."
+                return LLMResult(
+                    "The model declined to respond to this request.",
+                    total_in, total_out, self.model,
+                )
 
             for block in response.content:
                 if block.type == "text":
@@ -122,7 +151,24 @@ class ClaudeClient:
 
             messages.append({"role": "user", "content": tool_results})
 
-        return "".join(text_parts).strip()
+        return LLMResult("".join(text_parts).strip(), total_in, total_out, self.model)
+
+    def complete(self, system: str, user_message: str) -> LLMResult:
+        """Plain text completion, no tools (used by the eval judge)."""
+        response = self._client.messages.create(
+            model=self.model,
+            max_tokens=self.max_tokens,
+            system=system,
+            messages=[{"role": "user", "content": user_message}],
+        )
+        text = "".join(b.text for b in response.content if b.type == "text")
+        usage = response.usage
+        return LLMResult(
+            text,
+            usage.input_tokens if usage else 0,
+            usage.output_tokens if usage else 0,
+            self.model,
+        )
 
 
 def get_llm_client() -> LLMClient:

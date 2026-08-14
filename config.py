@@ -45,6 +45,8 @@ STRAVA_CLIENT_SECRET = os.getenv("STRAVA_CLIENT_SECRET")
 STRAVA_TOKENS_PATH = PROJECT_ROOT / ".strava_tokens.json"
 # Strava activity IDs already analyzed, so sync.py skips them (git-ignored).
 SYNCED_IDS_PATH = PROJECT_ROOT / ".synced_ids.json"
+# SQLite run log + eval results (git-ignored observability data).
+RUNS_DB_PATH = PROJECT_ROOT / "runs.db"
 
 # --- Notifications (Phase 3) -----------------------------------------------
 # Active delivery channels, comma-separated (e.g. "email"). Empty = no delivery,
