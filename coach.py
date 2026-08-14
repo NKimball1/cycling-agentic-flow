@@ -53,9 +53,12 @@ power in watts, heart rate in bpm.
 Reading training load:
 - `power_tss` is cycling load from power vs FTP (rides with a meter only).
 - `hr_tss` is heart-rate load and is comparable across ALL sports.
-- `load_tss` is the single number to compare activities on (power_tss for rides
-  with a meter, else hr_tss). hr_tss is an estimate — HR lags effort and drifts
-  with heat and fatigue — so treat it as approximate.
+- `load_tss` is the single number to compare activities on, and `load_source`
+  tells you how it was derived: "power" (most reliable), "hr" (an estimate — HR
+  lags effort and drifts with heat/fatigue), or "estimated" (a rough
+  duration-based guess used only when there's no power AND no HR). When
+  load_source is "estimated", use the number but call it an estimate and don't
+  over-interpret its precision; never invent a load figure of your own.
 
 Reading pace: quote `avg_pace` (already formatted, e.g. "11:49" per mile). \
 `avg_pace_min_per_mi` is decimal minutes for math only — never render it as a \
@@ -145,8 +148,11 @@ LOG_ACTIVITY_TOOL = {
 }
 
 
-def run_analysis(activity: dict, verbose: bool = True, dry_run: bool = False) -> str:
+def run_analysis(activity: dict, verbose: bool = True, dry_run: bool = False, model: str | None = None) -> str:
     """Analyze one activity (given its metrics dict), log it, return the Markdown.
+
+    `model` overrides which model runs the analysis (None = the configured
+    default). The eval harness uses this to benchmark models on the same task.
 
     `activity` is a metrics dict from EITHER source — fit_parser (a local .fit)
     or strava (the API). run_analysis is source-agnostic; that's the payoff of
@@ -209,7 +215,7 @@ def run_analysis(activity: dict, verbose: bool = True, dry_run: bool = False) ->
     # The provider seam runs the tool-use loop and returns the analysis + token
     # telemetry. log_activity is a terminal side effect (record and done), so we
     # stop as soon as it runs — no wasted follow-up turn, no post-tool text.
-    client = get_llm_client()
+    client = get_llm_client(model)
     started = time.monotonic()
     result = client.run_tool_loop(
         system=SYSTEM_PROMPT,

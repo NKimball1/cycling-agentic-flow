@@ -99,6 +99,21 @@ def log_eval(case_name, prompt_version, model, score, max_score, verdict, judge_
         )
 
 
+def model_stats(model: str, since_ts: str) -> dict:
+    """Average total tokens + latency for a model's runs since `since_ts` (ISO).
+
+    Used by the benchmark to read cost/speed for each model straight from the run
+    log — the observability data is exactly what the comparison needs.
+    """
+    with _conn() as conn:
+        avg_tokens, avg_latency, n = conn.execute(
+            "SELECT AVG(input_tokens + output_tokens), AVG(latency_s), COUNT(*) "
+            "FROM runs WHERE model = ? AND ts >= ? AND dry_run = 1",
+            (model, since_ts),
+        ).fetchone()
+    return {"avg_tokens": avg_tokens, "avg_latency": avg_latency, "n": n}
+
+
 def recent_runs(limit: int = 15):
     with _conn() as conn:
         return conn.execute(

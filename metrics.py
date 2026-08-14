@@ -114,3 +114,21 @@ def hr_tss(
     hr_if = (avg_hr - resting_hr) / (threshold_hr - resting_hr)
     hr_if = max(0.0, hr_if)  # guard against sub-resting averages
     return round((duration_sec / 3600) * hr_if ** 2 * 100, 1)
+
+
+# Intensity assumption for activities with NO power and NO HR (e.g. a bike with
+# no sensors). It's a tunable guess — easy-moderate — that keeps such activities
+# counting toward total load. Always flagged as an estimate (see load_source).
+DEFAULT_ESTIMATED_IF = 0.65
+
+
+def estimated_tss(duration_sec: float, intensity_factor: float = DEFAULT_ESTIMATED_IF) -> Optional[float]:
+    """Rough, duration-based load when there's no power and no HR to measure.
+
+    Uses the same `hours * IF^2 * 100` shape as the real load metrics, but with a
+    fixed assumed intensity. It's a ballpark so the activity still contributes to
+    total load — never presented as precise (callers set load_source='estimated').
+    """
+    if not duration_sec:
+        return None
+    return round((duration_sec / 3600) * intensity_factor ** 2 * 100, 1)

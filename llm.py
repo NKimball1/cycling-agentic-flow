@@ -171,11 +171,13 @@ class ClaudeClient:
         )
 
 
-def get_llm_client() -> LLMClient:
-    """Return the configured provider's client. Add new backends here."""
+def get_llm_client(model: str | None = None) -> LLMClient:
+    """Return the configured provider's client, optionally pinned to a specific
+    model (used by the eval harness to benchmark models and to fix the judge).
+    None → the provider's default model."""
     provider = config.LLM_PROVIDER.lower()
     if provider in ("anthropic", "claude"):
-        return ClaudeClient()
+        return ClaudeClient(model=model)  # None falls back to config.CLAUDE_MODEL
     raise ValueError(
         f"Unknown LLM_PROVIDER '{config.LLM_PROVIDER}'. Only 'anthropic' is "
         "implemented — add an adapter class in llm.py to support another provider."

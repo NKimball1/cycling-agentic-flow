@@ -35,6 +35,7 @@ from metrics import (
     normalized_power as _normalized_power,
     power_tss as _power_tss,
     hr_tss as _hr_tss,
+    estimated_tss as _estimated_tss,
 )
 
 
@@ -164,10 +165,17 @@ def get_activity_metrics(
     if max_hr is None and hr_samples:
         max_hr = max(hr_samples)
 
-    # HR-based load works for any sport; the unified load_tss prefers the
-    # power number for rides and falls back to HR otherwise.
+    # Unified load: prefer power, then HR, then a flagged duration-based estimate
+    # (so even a no-sensor ride still counts toward total load). load_source says
+    # which, so nothing pretends an estimate is a measurement.
     hr_tss = _hr_tss(moving_sec, avg_hr, resting_hr, threshold_hr)
-    load_tss = power_tss if power_tss is not None else hr_tss
+    if power_tss is not None:
+        load_tss, load_source = power_tss, "power"
+    elif hr_tss is not None:
+        load_tss, load_source = hr_tss, "hr"
+    else:
+        load_tss = _estimated_tss(moving_sec)
+        load_source = "estimated" if load_tss is not None else None
 
     # Pace — the natural intensity unit for runs and walks. Provided both as a
     # clock string (avg_pace, for display) and decimal minutes (for math).
@@ -210,6 +218,7 @@ def get_activity_metrics(
         "power_tss": power_tss,
         "hr_tss": hr_tss,
         "load_tss": load_tss,
+        "load_source": load_source,
         "work_kj": work_kj,
         "avg_hr_bpm": avg_hr,
         "max_hr_bpm": max_hr,

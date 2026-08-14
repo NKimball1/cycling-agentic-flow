@@ -18,6 +18,7 @@
   "power_tss": 92.6,
   "hr_tss": 111.0,
   "load_tss": 92.6,
+  "load_source": "power",
   "work_kj": 900,
   "avg_hr_bpm": 156,
   "max_hr_bpm": 175,

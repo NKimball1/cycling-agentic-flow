@@ -36,6 +36,9 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic")
 # Model for the Anthropic adapter. To trade quality for cost, set this to
 # claude-sonnet-5 in your .env.
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-5")
+# The eval judge's model — held FIXED so model-comparison scores stay comparable
+# (varying the judge too would move two variables at once). See evaluate.py.
+EVAL_JUDGE_MODEL = os.getenv("EVAL_JUDGE_MODEL", "claude-sonnet-5")
 
 # --- Strava API (Phase 2) --------------------------------------------------
 # From your Strava API application at https://www.strava.com/settings/api.

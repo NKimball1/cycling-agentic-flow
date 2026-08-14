@@ -194,7 +194,14 @@ def activity_to_metrics(
     avg_hr = _round_or_none(detail.get("average_heartrate"))
     max_hr = _round_or_none(detail.get("max_heartrate"))
     hr_load = metrics.hr_tss(moving_sec, avg_hr, resting_hr, threshold_hr)
-    load_tss = power_load if power_load is not None else hr_load
+    # Prefer power, then HR, then a flagged duration-based estimate.
+    if power_load is not None:
+        load_tss, load_source = power_load, "power"
+    elif hr_load is not None:
+        load_tss, load_source = hr_load, "hr"
+    else:
+        load_tss = metrics.estimated_tss(moving_sec)
+        load_source = "estimated" if load_tss is not None else None
 
     return {
         "source": "strava",
@@ -216,6 +223,7 @@ def activity_to_metrics(
         "power_tss": power_load,
         "hr_tss": hr_load,
         "load_tss": load_tss,
+        "load_source": load_source,
         "work_kj": _round_or_none(detail.get("kilojoules")),
         "avg_hr_bpm": avg_hr,
         "max_hr_bpm": max_hr,

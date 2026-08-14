@@ -1,5 +1,5 @@
 {
-  "_note": "Friday MTB ride with no power and no HR sensors. Tests graceful handling of missing data (load_tss is null — no fabricated number) and unplanned classification (Friday is rest/shakeout).",
+  "_note": "Friday MTB ride with no power and no HR sensors. Tests graceful handling of missing data: load_tss is a code-computed ESTIMATE (load_source='estimated'), which the coach should use but label as an estimate, not treat as measured. Also tests unplanned classification (Friday is rest/shakeout).",
   "source": "strava",
   "date": "2026-08-14T16:00:00",
   "sport": "cycling",
@@ -17,7 +17,8 @@
   "intensity_factor": null,
   "power_tss": null,
   "hr_tss": null,
-  "load_tss": null,
+  "load_tss": 43.7,
+  "load_source": "estimated",
   "work_kj": null,
   "avg_hr_bpm": null,
   "max_hr_bpm": null,

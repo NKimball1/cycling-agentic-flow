@@ -8,8 +8,9 @@ Score the coach's analysis on each criterion from 0 to 2:
 Criteria:
 
 1. **Sport & metrics** — Correctly identifies the sport and reads the available
-   metrics. Handles missing data honestly (e.g. no power/HR → says so, does NOT
-   invent numbers or a load figure that can't exist).
+   metrics. Handles missing data honestly: with no power/HR it uses the provided
+   estimated load (`load_source` = "estimated") and CALLS it an estimate; it must
+   not invent its own precise figures or claim data it wasn't given.
 
 2. **Planned vs. unplanned** — Correctly decides whether the activity maps to a
    prescribed session. Does NOT force-grade an incidental walk/hike/cross-train
