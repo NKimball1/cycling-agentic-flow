@@ -21,9 +21,25 @@ provider-agnostic: it never imports a vendor SDK.
 from __future__ import annotations
 
 import json
+from datetime import datetime
 
 from llm import get_llm_client
 from plan_loader import get_training_plan, get_recent_activities, append_activity
+
+
+def _weekday(date_str: str | None) -> str | None:
+    """Weekday name for a 'YYYY-MM-DD...' date string, computed reliably in code.
+
+    LLMs are unreliable at deriving weekdays and doing date arithmetic (it's
+    computation, not language), so we compute these facts here and hand them to
+    the model instead of making it reason about the calendar.
+    """
+    if not date_str:
+        return None
+    try:
+        return datetime.strptime(date_str[:10], "%Y-%m-%d").strftime("%A")
+    except (ValueError, TypeError):
+        return None
 
 SYSTEM_PROMPT = """You are an experienced endurance coach analyzing a single \
 training activity for an athlete whose primary sport is cycling but who also \
@@ -45,6 +61,11 @@ sport, intensity, and the plan's weekly structure). If it does NOT, treat it as 
 unplanned or supplemental: acknowledge it, account for its load and any recovery \
 effect, but do not grade it against a workout it was never meant to be. A walk \
 on a rest day is not a missed session, and a hike is not a failed ride.
+
+Dates and weekdays are computed for you and given at the top of the message \
+(today's date, and this activity's date and weekday). Use them directly; do NOT \
+calculate weekdays or date differences yourself — that is error-prone. When \
+mapping the activity to the plan's weekly structure, use the provided weekday.
 
 You are given three things: the metrics for the activity to analyze, the \
 athlete's training plan, and their recent activity history (all sports). \
@@ -134,8 +155,21 @@ def run_analysis(activity: dict, verbose: bool = True, dry_run: bool = False) ->
             f"{activity.get('source')}; {len(recent)} activities in history."
         )
 
+    # Compute date facts here (code is reliable at this; the model is not) and
+    # inject them prominently so the model never has to derive a weekday.
+    today = datetime.now()
+    activity_weekday = _weekday(activity.get("date"))
+    activity_date = (activity.get("date") or "")[:10] or "unknown"
+    date_facts = (
+        "## Date facts (computed for you — authoritative; do not recompute)\n"
+        f"- Today: {today.strftime('%Y-%m-%d (%A)')}\n"
+        f"- This activity's date: {activity_date}"
+        f"{f' ({activity_weekday})' if activity_weekday else ''}\n\n"
+    )
+
     user_message = (
         "Analyze this activity, then log it.\n\n"
+        f"{date_facts}"
         "## Activity to analyze (metrics)\n"
         f"```json\n{json.dumps(activity, indent=2, default=str)}\n```\n\n"
         "## Training plan\n"
