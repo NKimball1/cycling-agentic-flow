@@ -23,9 +23,10 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import runlog
+import training_load
 from llm import get_llm_client
 from plan_loader import get_training_plan, get_recent_activities, append_activity
 
@@ -58,6 +59,41 @@ def _days_before(reference: str | None, other: str | None) -> int | None:
     except (ValueError, TypeError):
         return None
     return (ref - oth).days
+
+
+def _calendar_facts(activity_date: str, back_days: int = 21, forward_days: int = 28) -> str:
+    """A weekday calendar for the weeks around the activity, so the model can look
+    up the weekday of ANY date it wants to mention — a plan milestone (block
+    start), an upcoming session, a past ride — instead of computing it.
+
+    Parsing the plan's prose dates ("Aug 18-31") in code is fuzzy and risks
+    injecting a wrong "authoritative" fact; a calendar is pure, reliable date
+    math and covers every date in range, whatever the model references.
+    """
+    try:
+        d = datetime.strptime((activity_date or "")[:10], "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return ""
+    labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    start = d - timedelta(days=back_days)
+    start -= timedelta(days=start.weekday())  # snap back to Monday
+    end = d + timedelta(days=forward_days)
+    base_year = d.year
+    rows = []
+    week = start
+    while week <= end:
+        cells = []
+        for i in range(7):
+            day = week + timedelta(days=i)
+            stamp = day.strftime("%m-%d") if day.year == base_year else day.isoformat()
+            cells.append(f"{labels[i]} {stamp}")
+        rows.append("- " + " | ".join(cells))
+        week += timedelta(days=7)
+    return (
+        f"## Weekday calendar (all dates {base_year} unless a year is shown; "
+        "authoritative — look up any date's weekday here, do NOT compute it)\n"
+        + "\n".join(rows) + "\n\n"
+    )
 
 
 def _timing_facts(activity_date: str, recent: list) -> str:
@@ -118,6 +154,31 @@ def _weather_facts(activity: dict) -> str:
         return ""
     return "## Weather at the start (measured, not estimated)\n- " + ", ".join(parts) + "\n\n"
 
+
+def _load_facts(state: dict | None) -> str:
+    """Format a training-load state (from training_load.compute_load) into the
+    facts block the model reads. The model reads the state but never recomputes
+    the rolling averages. Returns "" when there's no state to show."""
+    if not state:
+        return ""
+    lines = [
+        "## Training-load state (Fitness / Fatigue / Form — computed from your history)",
+        f"- Fitness (CTL, 42-day): {state['fitness_ctl']} (current, incl. this activity)",
+        f"- Fatigue (ATL, 7-day): {state['fatigue_atl']} (current, incl. this activity)",
+        f"- Form (TSB): {state['form_tsb_pre']} going INTO this session -> "
+        f"{state['form_tsb_post']} after ({state['form_label']})",
+    ]
+    if state["ctl_ramp_7d"] is not None:
+        trend = "building" if state["ctl_ramp_7d"] > 0 else "detraining" if state["ctl_ramp_7d"] < 0 else "flat"
+        lines.append(f"- 7-day fitness trend (CTL ramp): {state['ctl_ramp_7d']:+} ({trend})")
+    if state["warming_up"]:
+        lines.append(
+            f"- NOTE: based on only {state['days_of_history']} days of history "
+            f"(seeded at {state['seed_value']}); CTL is still warming up — treat "
+            f"fitness as an approximate floor, not an exact figure."
+        )
+    return "\n".join(lines) + "\n\n"
+
 SYSTEM_PROMPT = """You are an experienced endurance coach analyzing a single \
 training activity for an athlete whose primary sport is cycling but who also \
 runs and walks. Every activity — ride, run, or walk — counts toward the plan \
@@ -137,6 +198,19 @@ Reading training load:
 Reading pace: quote `avg_pace` (already formatted, e.g. "11:49" per mile). \
 `avg_pace_min_per_mi` is decimal minutes for math only — never render it as a \
 clock time.
+
+Training-load state is computed for you and provided: Fitness (CTL, a 42-day \
+average of load), Fatigue (ATL, a 7-day average), and Form (TSB = Fitness − \
+Fatigue). Read Form as readiness: clearly positive means fresh/tapered, mildly \
+negative is normal productive training, and deeply negative (roughly below −30) \
+signals accumulated strain worth respecting. Use the "Form going INTO this \
+session" value to judge whether the athlete was rested or fatigued for THIS \
+effort (e.g. a strong session on tired legs is more impressive; a flat session \
+on fresh legs is worth a closer look), and the 7-day fitness trend to say \
+whether they're building, holding, or detraining. Do NOT recompute these \
+numbers — quote the provided values. When the note says the history is still \
+warming up, treat Fitness as an approximate floor and don't over-interpret its \
+exact value.
 
 Weather at the start (temperature, apparent "feels-like" temperature, humidity, \
 wind, precipitation, conditions) is MEASURED and provided when available. Use it \
@@ -160,7 +234,10 @@ timing" — exactly how many days before (or after) this activity each recent \
 activity happened. Use these directly; do NOT calculate weekdays or date \
 differences yourself — that is error-prone. When you reference recovery windows \
 or the spacing between sessions (e.g. "a hard run two days ago"), quote the \
-provided day counts rather than deriving them.
+provided day counts rather than deriving them. A weekday calendar for the \
+surrounding weeks is also provided: to state the weekday of ANY date — a plan \
+milestone like a block start, an upcoming session, or a past activity — look it \
+up in that calendar. Never compute or guess a weekday yourself.
 
 You are given three things: the metrics for the activity to analyze, the \
 athlete's training plan, and their recent activity history (all sports). \
@@ -233,7 +310,13 @@ LOG_ACTIVITY_TOOL = {
 }
 
 
-def run_analysis(activity: dict, verbose: bool = True, dry_run: bool = False, model: str | None = None) -> str:
+def run_analysis(
+    activity: dict,
+    verbose: bool = True,
+    dry_run: bool = False,
+    model: str | None = None,
+    load_state: dict | None = None,
+) -> str:
     """Analyze one activity (given its metrics dict), log it, return the Markdown.
 
     `model` overrides which model runs the analysis (None = the configured
@@ -251,6 +334,14 @@ def run_analysis(activity: dict, verbose: bool = True, dry_run: bool = False, mo
     # The plan and history are always needed, so gathering them is plain code.
     plan = get_training_plan()
     recent = get_recent_activities()
+
+    # Rolling load state (Fitness/Fatigue/Form), derived from history. Callers
+    # (the eval harness) may pass an explicit state to test a controlled
+    # scenario; real runs compute it here.
+    if load_state is None:
+        load_state = training_load.compute_load(
+            recent, activity.get("date"), activity_tss=activity.get("load_tss")
+        )
 
     if verbose:
         print(
@@ -274,6 +365,8 @@ def run_analysis(activity: dict, verbose: bool = True, dry_run: bool = False, mo
     user_message = (
         "Analyze this activity, then log it.\n\n"
         f"{date_facts}"
+        f"{_calendar_facts(activity_date)}"
+        f"{_load_facts(load_state)}"
         f"{_weather_facts(activity)}"
         "## Activity to analyze (metrics)\n"
         f"```json\n{json.dumps(activity, indent=2, default=str)}\n```\n\n"

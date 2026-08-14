@@ -25,5 +25,9 @@ data/recent_activities.json
 # Your exported ride files
 data/*.fit
 
+# Backups of personal data (from history normalization, etc.)
+data/*.bak
+data/*.backup*.json
+
 # Local Claude Code settings (machine-specific)
 .claude/settings.local.json

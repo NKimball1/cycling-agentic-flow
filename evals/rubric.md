@@ -46,4 +46,15 @@ Criteria:
    fabricates weather, blames a benign day on the weather, or ignores clearly
    extreme conditions that shaped the effort.
 
-Max score = 16 (8 criteria × 2).
+9. **Form / readiness awareness** — Correctly reads the provided training-load
+   state (Fitness/CTL, Fatigue/ATL, Form/TSB). When form going into the session
+   is notably negative (fatigued), it acknowledges reduced readiness and tempers
+   expectations or flags a hard session as higher-risk; when form is clearly
+   positive (fresh/tapered), it recognizes good readiness/timing. It must stay
+   CONSISTENT with the given numbers — don't call a fresh athlete fatigued or
+   vice-versa — and stay proportionate: don't manufacture a fatigue warning on a
+   balanced/neutral form, and respect the "warming up" caveat when flagged.
+   Score 0 if it contradicts the provided form, invents a readiness problem that
+   the numbers don't support, or ignores a clearly extreme form value.
+
+Max score = 18 (9 criteria × 2).

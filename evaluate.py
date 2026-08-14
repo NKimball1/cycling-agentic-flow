@@ -21,6 +21,7 @@ from datetime import datetime
 
 import config
 import runlog
+import training_load
 from coach import run_analysis, PROMPT_VERSION, _weekday
 from llm import get_llm_client
 from plan_loader import get_training_plan, get_recent_activities
@@ -54,14 +55,22 @@ def _extract_json(text: str) -> dict:
     return json.loads(t.strip())
 
 
-def judge(activity: dict, analysis: str, rubric: str, plan: dict, recent: list, correct_weekday: str) -> dict:
+def judge(activity: dict, analysis: str, rubric: str, plan: dict, recent: list,
+          correct_weekday: str, load_state: dict | None) -> dict:
     """LLM-as-judge: score one analysis against the rubric. Returns the parsed
     JSON verdict.
 
-    The judge is given the SAME context the coach had — plan, recent history, and
-    the code-computed weekday — so it can verify grounding and dates fairly
-    rather than flagging real data it simply wasn't shown.
+    The judge is given the SAME context the coach had — plan, recent history, the
+    code-computed weekday, and the derived training-load state — so it can verify
+    grounding, dates, and readiness fairly rather than flagging data it wasn't
+    shown. (Form/TSB is derived, not in the activity JSON, so without this the
+    judge couldn't check criterion 9.)
     """
+    load_block = (
+        f"# Training-load state the coach was given (authoritative — use it to score readiness)\n"
+        f"```json\n{json.dumps(load_state, indent=2, default=str)}\n```\n\n"
+        if load_state else ""
+    )
     user = (
         "# Rubric\n" + rubric + "\n\n"
         "# Athlete's training plan\n"
@@ -69,12 +78,13 @@ def judge(activity: dict, analysis: str, rubric: str, plan: dict, recent: list, 
         "# Recent activity history (the coach had this too — use it to verify grounding)\n"
         f"```json\n{json.dumps(recent, indent=2, default=str)}\n```\n\n"
         f"# Correct weekday for this activity (computed reliably): {correct_weekday}\n\n"
+        + load_block +
         "# The activity that was analyzed\n"
         f"```json\n{json.dumps(activity, indent=2, default=str)}\n```\n\n"
         "# The coach's analysis to score\n" + analysis + "\n\n"
         "Score each rubric criterion 0-2. Output ONLY this JSON:\n"
         '{"criteria": [{"name": "...", "score": N, "reason": "..."}], '
-        '"total": N, "max_total": 16, "verdict": "one-sentence summary"}'
+        '"total": N, "max_total": 18, "verdict": "one-sentence summary"}'
     )
     # Judge is pinned to a FIXED model so scores stay comparable when we vary
     # the coach's model — otherwise a "better" score could just be a softer judge.
@@ -95,17 +105,24 @@ def run_eval(coach_model, rubric, plan, recent, cases, verbose=True):
     total = max_total = 0.0
     for path in cases:
         name = path.stem
-        activity = _strip_notes(json.loads(path.read_text(encoding="utf-8")))
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        activity = _strip_notes(raw)
+        # A case may pin an explicit training-load state (to test a controlled
+        # readiness scenario); otherwise derive it from history like a real run.
+        # Compute once and give the SAME state to coach and judge so they agree.
+        load_state = raw.get("_load_state") or training_load.compute_load(
+            recent, activity.get("date"), activity_tss=activity.get("load_tss")
+        )
         try:
-            analysis = run_analysis(activity, verbose=False, dry_run=True, model=coach_model)
-            verdict = judge(activity, analysis, rubric, plan, recent, _weekday(activity.get("date")))
+            analysis = run_analysis(activity, verbose=False, dry_run=True, model=coach_model, load_state=load_state)
+            verdict = judge(activity, analysis, rubric, plan, recent, _weekday(activity.get("date")), load_state)
         except Exception as exc:
             # e.g. a model this account can't access — skip it, don't crash the batch.
             if verbose:
                 print(f"  {name:<22} FAILED: {exc}")
             continue
         t = float(verdict.get("total", 0))
-        m = float(verdict.get("max_total", 16))
+        m = float(verdict.get("max_total", 18))
         total += t
         max_total += m
         runlog.log_eval(name, PROMPT_VERSION, coach_model, t, m, verdict.get("verdict", ""), json.dumps(verdict))
