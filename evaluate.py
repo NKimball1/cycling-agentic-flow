@@ -74,7 +74,7 @@ def judge(activity: dict, analysis: str, rubric: str, plan: dict, recent: list, 
         "# The coach's analysis to score\n" + analysis + "\n\n"
         "Score each rubric criterion 0-2. Output ONLY this JSON:\n"
         '{"criteria": [{"name": "...", "score": N, "reason": "..."}], '
-        '"total": N, "max_total": 14, "verdict": "one-sentence summary"}'
+        '"total": N, "max_total": 16, "verdict": "one-sentence summary"}'
     )
     # Judge is pinned to a FIXED model so scores stay comparable when we vary
     # the coach's model — otherwise a "better" score could just be a softer judge.
@@ -105,7 +105,7 @@ def run_eval(coach_model, rubric, plan, recent, cases, verbose=True):
                 print(f"  {name:<22} FAILED: {exc}")
             continue
         t = float(verdict.get("total", 0))
-        m = float(verdict.get("max_total", 14))
+        m = float(verdict.get("max_total", 16))
         total += t
         max_total += m
         runlog.log_eval(name, PROMPT_VERSION, coach_model, t, m, verdict.get("verdict", ""), json.dumps(verdict))

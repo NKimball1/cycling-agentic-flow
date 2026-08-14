@@ -28,6 +28,7 @@ import requests
 
 import config
 import metrics
+import weather
 
 AUTHORIZE_URL = "https://www.strava.com/oauth/authorize"
 TOKEN_URL = "https://www.strava.com/oauth/token"
@@ -207,6 +208,7 @@ def activity_to_metrics(
         "source": "strava",
         "strava_activity_id": detail.get("id"),
         "date": detail.get("start_date_local"),
+        "start_latlng": detail.get("start_latlng") or None,
         "sport": sport,
         "sub_sport": sport_type,
         "moving_duration_min": round(moving_sec / 60, 1) if moving_sec else None,
@@ -244,11 +246,16 @@ def get_activity_metrics(
     resting_hr: int | None = None,
     threshold_hr: int | None = None,
 ) -> dict:
-    """Fetch one activity from Strava and return it as a metrics dict."""
+    """Fetch one activity from Strava and return it as a metrics dict.
+
+    Also enriches with weather (best-effort) using the activity's start location
+    and time, so the coach sees the conditions the effort happened in.
+    """
     detail = get_activity(activity_id)
-    return activity_to_metrics(
+    m = activity_to_metrics(
         detail, ftp=ftp, resting_hr=resting_hr, threshold_hr=threshold_hr
     )
+    return weather.enrich_metrics(m)
 
 
 if __name__ == "__main__":

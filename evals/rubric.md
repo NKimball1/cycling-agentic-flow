@@ -34,4 +34,16 @@ Criteria:
 7. **Formatting** — Clean sections; pace shown as a proper clock time (e.g.
    "11:49"), no malformed values like "11:81".
 
-Max score = 14 (7 criteria × 2).
+8. **Weather, proportionately** — Uses provided weather ONLY when it plausibly
+   mattered. When conditions are notable (extreme heat, high humidity, strong
+   wind, hard cold), it accounts for the likely effect — e.g. heat/humidity
+   raising HR and driving cardiac drift/decoupling (so elevated HR at endurance
+   power is the weather, not lost fitness), or wind disrupting steady effort.
+   When conditions are benign/ideal (e.g. ~70°F, low humidity, light wind), or
+   when NO weather was provided, it does NOT lean on weather as an excuse or
+   invent conditions — a brief "conditions were good" is fine, but weather must
+   not become an overreaching explanation for an ordinary day. Score 0 if it
+   fabricates weather, blames a benign day on the weather, or ignores clearly
+   extreme conditions that shaped the effort.
+
+Max score = 16 (8 criteria × 2).

@@ -44,6 +44,80 @@ def _weekday(date_str: str | None) -> str | None:
     except (ValueError, TypeError):
         return None
 
+
+def _days_before(reference: str | None, other: str | None) -> int | None:
+    """Whole days that `other` falls before `reference` (both 'YYYY-MM-DD...').
+
+    Positive = `other` is before the reference, 0 = same day, negative = after.
+    Returns None if either date can't be parsed. Date subtraction is arithmetic,
+    not language — so we do it here and hand the model the answer.
+    """
+    try:
+        ref = datetime.strptime((reference or "")[:10], "%Y-%m-%d")
+        oth = datetime.strptime((other or "")[:10], "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return None
+    return (ref - oth).days
+
+
+def _timing_facts(activity_date: str, recent: list) -> str:
+    """Pre-compute how long before (or after) THIS activity each recent activity
+    happened, so the model never has to subtract dates itself.
+
+    This closes a real bug the eval surfaced: the coach reasons well about
+    single-activity dates (weekday is injected) but fumbles inter-activity gaps
+    like "the hard ride two days ago" when left to compute them. We give it those
+    gaps as authoritative facts instead.
+    """
+    lines = []
+    for a in recent:
+        d = a.get("date")
+        delta = _days_before(activity_date, d)
+        if delta is None:
+            continue
+        weekday = _weekday(d)
+        weekday_s = f" {weekday}" if weekday else ""
+        name = a.get("name") or a.get("type") or a.get("sport") or "activity"
+        if delta > 0:
+            rel = f"{delta} day{'s' if delta != 1 else ''} before this activity"
+        elif delta == 0:
+            rel = "same day as this activity"
+        else:
+            n = -delta
+            rel = f"{n} day{'s' if n != 1 else ''} after this activity"
+        lines.append(f"- {d}{weekday_s} — {name}: {rel}")
+    if not lines:
+        return ""
+    return (
+        "### Recent activity timing (days relative to this activity — authoritative, "
+        "do not recompute)\n" + "\n".join(lines) + "\n\n"
+    )
+
+
+def _weather_facts(activity: dict) -> str:
+    """A compact, human-readable weather line for the model, when weather was
+    resolved for this activity. Measured conditions (from weather.py) — the model
+    interprets them (heat drift, wind, cold) but never invents them."""
+    w = activity.get("weather")
+    if not w:
+        return ""
+    parts = []
+    if w.get("temp_f") is not None:
+        parts.append(f"{w['temp_f']:.0f}°F")
+    if w.get("apparent_temp_f") is not None:
+        parts.append(f"feels {w['apparent_temp_f']:.0f}°F")
+    if w.get("humidity_pct") is not None:
+        parts.append(f"{w['humidity_pct']:.0f}% humidity")
+    if w.get("wind_mph") is not None:
+        parts.append(f"{w['wind_mph']:.0f} mph wind")
+    if w.get("precip_in"):
+        parts.append(f"{w['precip_in']:.2f} in precip")
+    if w.get("conditions"):
+        parts.append(str(w["conditions"]))
+    if not parts:
+        return ""
+    return "## Weather at the start (measured, not estimated)\n- " + ", ".join(parts) + "\n\n"
+
 SYSTEM_PROMPT = """You are an experienced endurance coach analyzing a single \
 training activity for an athlete whose primary sport is cycling but who also \
 runs and walks. Every activity — ride, run, or walk — counts toward the plan \
@@ -64,6 +138,14 @@ Reading pace: quote `avg_pace` (already formatted, e.g. "11:49" per mile). \
 `avg_pace_min_per_mi` is decimal minutes for math only — never render it as a \
 clock time.
 
+Weather at the start (temperature, apparent "feels-like" temperature, humidity, \
+wind, precipitation, conditions) is MEASURED and provided when available. Use it \
+to explain physiology and execution: heat and humidity raise HR and drive \
+cardiac drift/decoupling (so a higher HR at the same power may be the weather, \
+not lost fitness); wind distorts pace and power-vs-speed; cold changes warmup and \
+early effort. Reference weather only when it is provided — never invent \
+conditions, and if none is given, don't speculate about it.
+
 Planned vs. unplanned: not every activity is a prescribed workout. Some are just \
 life — an easy walk, a hike, casual cross-training. Before comparing an activity \
 to the plan, judge whether it actually corresponds to a prescribed session (by \
@@ -72,10 +154,13 @@ unplanned or supplemental: acknowledge it, account for its load and any recovery
 effect, but do not grade it against a workout it was never meant to be. A walk \
 on a rest day is not a missed session, and a hike is not a failed ride.
 
-Dates and weekdays are computed for you and given at the top of the message \
-(today's date, and this activity's date and weekday). Use them directly; do NOT \
-calculate weekdays or date differences yourself — that is error-prone. When \
-mapping the activity to the plan's weekly structure, use the provided weekday.
+Dates and weekdays are computed for you and given at the top of the message: \
+today's date, this activity's date and weekday, and — under "Recent activity \
+timing" — exactly how many days before (or after) this activity each recent \
+activity happened. Use these directly; do NOT calculate weekdays or date \
+differences yourself — that is error-prone. When you reference recovery windows \
+or the spacing between sessions (e.g. "a hard run two days ago"), quote the \
+provided day counts rather than deriving them.
 
 You are given three things: the metrics for the activity to analyze, the \
 athlete's training plan, and their recent activity history (all sports). \
@@ -183,11 +268,13 @@ def run_analysis(activity: dict, verbose: bool = True, dry_run: bool = False, mo
         f"- Today: {today.strftime('%Y-%m-%d (%A)')}\n"
         f"- This activity's date: {activity_date}"
         f"{f' ({activity_weekday})' if activity_weekday else ''}\n\n"
+        + _timing_facts(activity_date, recent)
     )
 
     user_message = (
         "Analyze this activity, then log it.\n\n"
         f"{date_facts}"
+        f"{_weather_facts(activity)}"
         "## Activity to analyze (metrics)\n"
         f"```json\n{json.dumps(activity, indent=2, default=str)}\n```\n\n"
         "## Training plan\n"
