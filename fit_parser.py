@@ -31,6 +31,7 @@ from metrics import (
     mps_to_mph as _mps_to_mph,
     c_to_f as _c_to_f,
     pace_min_per_mi as _pace_min_per_mi,
+    pace_str as _pace_str,
     normalized_power as _normalized_power,
     power_tss as _power_tss,
     hr_tss as _hr_tss,
@@ -168,7 +169,9 @@ def get_activity_metrics(
     hr_tss = _hr_tss(moving_sec, avg_hr, resting_hr, threshold_hr)
     load_tss = power_tss if power_tss is not None else hr_tss
 
-    # Pace (min/mile) — the natural intensity unit for runs and walks.
+    # Pace — the natural intensity unit for runs and walks. Provided both as a
+    # clock string (avg_pace, for display) and decimal minutes (for math).
+    avg_pace = _pace_str(avg_speed_mps)
     avg_pace_min_per_mi = _pace_min_per_mi(avg_speed_mps)
 
     # --- Cadence ---
@@ -198,6 +201,7 @@ def get_activity_metrics(
         "distance_mi": _m_to_mi(distance_m),
         "avg_speed_mph": _mps_to_mph(avg_speed_mps),
         "max_speed_mph": _mps_to_mph(max_speed_mps),
+        "avg_pace": avg_pace,
         "avg_pace_min_per_mi": avg_pace_min_per_mi,
         "avg_power_w": avg_power,
         "max_power_w": max_power,

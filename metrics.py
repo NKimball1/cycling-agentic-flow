@@ -32,10 +32,24 @@ def c_to_f(celsius: Optional[float]) -> Optional[int]:
 
 
 def pace_min_per_mi(mps: Optional[float]) -> Optional[float]:
-    """Average pace in minutes per mile — the natural unit for runs and walks."""
+    """Average pace in minutes per mile (decimal) — for calculations."""
     if not mps or mps <= 0:
         return None
     return round(METERS_PER_MILE / mps / 60, 2)
+
+
+def pace_str(mps: Optional[float]) -> Optional[str]:
+    """Average pace as a clock string 'M:SS' per mile (e.g. '11:49'), or None.
+
+    Provided alongside the decimal so the model quotes a correctly-formatted
+    pace instead of mangling the decimal into a fake clock time (rendering 11.81
+    as '11:81'). Formatting belongs in code, not the model.
+    """
+    if not mps or mps <= 0:
+        return None
+    total_seconds = round(METERS_PER_MILE / mps)
+    minutes, seconds = divmod(total_seconds, 60)
+    return f"{minutes}:{seconds:02d}"
 
 
 def normalized_power(power_samples: list[int]) -> Optional[int]:

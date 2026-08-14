@@ -54,6 +54,10 @@ Reading training load:
   with a meter, else hr_tss). hr_tss is an estimate — HR lags effort and drifts
   with heat and fatigue — so treat it as approximate.
 
+Reading pace: quote `avg_pace` (already formatted, e.g. "11:49" per mile). \
+`avg_pace_min_per_mi` is decimal minutes for math only — never render it as a \
+clock time.
+
 Planned vs. unplanned: not every activity is a prescribed workout. Some are just \
 life — an easy walk, a hike, casual cross-training. Before comparing an activity \
 to the plan, judge whether it actually corresponds to a prescribed session (by \

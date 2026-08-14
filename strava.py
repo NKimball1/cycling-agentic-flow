@@ -207,6 +207,7 @@ def activity_to_metrics(
         "distance_mi": metrics.m_to_mi(detail.get("distance")),
         "avg_speed_mph": metrics.mps_to_mph(detail.get("average_speed")),
         "max_speed_mph": metrics.mps_to_mph(detail.get("max_speed")),
+        "avg_pace": metrics.pace_str(detail.get("average_speed")),
         "avg_pace_min_per_mi": metrics.pace_min_per_mi(detail.get("average_speed")),
         "avg_power_w": avg_power,
         "max_power_w": max_power,
