@@ -38,6 +38,7 @@ import json
 from datetime import datetime
 
 import config
+import storage
 
 _ACTIVE = ("pending", "approved")  # statuses that still "count" for dedupe/context
 
@@ -50,9 +51,7 @@ def load() -> list:
 
 
 def _save(items: list) -> None:
-    path = config.PLAN_ADJUSTMENTS_PATH
-    path.parent.mkdir(exist_ok=True)
-    path.write_text(json.dumps(items, indent=2) + "\n", encoding="utf-8")
+    storage.write_json_atomic(config.PLAN_ADJUSTMENTS_PATH, items)
 
 
 def _make_id(fields: dict, created: str) -> str:

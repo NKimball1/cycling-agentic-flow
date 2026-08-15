@@ -29,6 +29,7 @@ import requests
 import config
 import metrics
 import net
+import storage
 import weather
 
 # All Strava calls go through one session that retries transient failures
@@ -57,7 +58,7 @@ def _require_credentials() -> None:
 
 # --- Token storage ---------------------------------------------------------
 def _save_tokens(tokens: dict) -> None:
-    Path(config.STRAVA_TOKENS_PATH).write_text(json.dumps(tokens, indent=2), encoding="utf-8")
+    storage.write_json_atomic(config.STRAVA_TOKENS_PATH, tokens)
 
 
 def _load_tokens() -> dict | None:

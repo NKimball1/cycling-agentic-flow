@@ -11,6 +11,10 @@ runs.db
 # Python
 __pycache__/
 *.pyc
+
+# Temp files from atomic writes (should be transient; ignored so a crashed
+# write can't leave personal data staged for commit).
+*.tmp
 .venv/
 venv/
 

@@ -19,6 +19,7 @@ import json
 
 import config
 import metrics
+import storage
 
 
 # --- History schema normalization -----------------------------------------
@@ -126,9 +127,7 @@ def append_activity(entry: dict) -> dict:
     # Sort newest first; entries without a date sink to the bottom.
     activities.sort(key=lambda a: a.get("date") or "", reverse=True)
 
-    with open(config.RECENT_ACTIVITIES_PATH, "w", encoding="utf-8") as f:
-        json.dump(activities, f, indent=2)
-        f.write("\n")
+    storage.write_json_atomic(config.RECENT_ACTIVITIES_PATH, activities)
 
     return {"status": "logged", "activity": entry.get("name"), "total_activities": len(activities)}
 

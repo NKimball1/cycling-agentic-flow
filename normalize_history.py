@@ -20,6 +20,7 @@ import json
 from datetime import datetime
 
 import config
+import storage
 from plan_loader import normalize_entry
 
 
@@ -65,9 +66,7 @@ def main() -> None:
     with open(backup, "w", encoding="utf-8") as f:
         json.dump(activities, f, indent=2)
         f.write("\n")
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(normalized, f, indent=2)
-        f.write("\n")
+    storage.write_json_atomic(path, normalized)
     print(f"\nBacked up original -> {backup}")
     print(f"Wrote normalized   -> {path}")
 

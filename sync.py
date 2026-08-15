@@ -26,6 +26,7 @@ from datetime import datetime
 from pathlib import Path
 
 import config
+import storage
 import strava
 import notify
 from coach import run_analysis
@@ -39,9 +40,7 @@ def _load_synced_ids() -> set[int]:
 
 
 def _save_synced_ids(ids: set[int]) -> None:
-    Path(config.SYNCED_IDS_PATH).write_text(
-        json.dumps(sorted(ids), indent=2), encoding="utf-8"
-    )
+    storage.write_json_atomic(config.SYNCED_IDS_PATH, sorted(ids))
 
 
 def _save_analysis(activity: dict, text: str) -> Path:
