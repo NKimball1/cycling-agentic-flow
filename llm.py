@@ -52,15 +52,17 @@ class LLMClient(Protocol):
         tools: list[dict],
         tool_executor: ToolExecutor,
         verbose: bool = True,
-        tools_are_terminal: bool = False,
+        terminal_tools: set[str] | None = None,
     ) -> LLMResult:
         """Send the request, execute any tool calls via `tool_executor`, and
         return the model's text plus token telemetry. `tools` are neutral specs
         (see module docstring); the adapter translates them for its provider.
 
-        If `tools_are_terminal` is True, the tools are fire-and-forget side
-        effects: once executed, the loop stops without a follow-up model turn.
-        That avoids a wasted round-trip and any post-tool acknowledgment text."""
+        `terminal_tools` names the tools that END the loop: once one of them runs
+        (e.g. log_activity — record and done), the loop stops without a follow-up
+        model turn, avoiding a wasted round-trip and post-tool ack text. Tools NOT
+        in the set are mid-conversation: their results are fed back so the model
+        can act again (e.g. propose an adjustment, then log the activity)."""
         ...
 
     def complete(self, system: str, user_message: str) -> LLMResult:
@@ -96,7 +98,7 @@ class ClaudeClient:
         tools: list[dict],
         tool_executor: ToolExecutor,
         verbose: bool = True,
-        tools_are_terminal: bool = False,
+        terminal_tools: set[str] | None = None,
     ) -> LLMResult:
         anthropic_tools = self._to_anthropic_tools(tools)
         messages = [{"role": "user", "content": user_message}]
@@ -132,10 +134,13 @@ class ClaudeClient:
 
             messages.append({"role": "assistant", "content": response.content})
             tool_results = []
+            hit_terminal = False
             for block in response.content:
                 if block.type != "tool_use":
                     continue
                 result = tool_executor(block.name, dict(block.input))
+                if terminal_tools and block.name in terminal_tools:
+                    hit_terminal = True
                 tool_results.append(
                     {
                         "type": "tool_result",
@@ -144,9 +149,11 @@ class ClaudeClient:
                     }
                 )
 
-            # Terminal tools are side effects only — they've now run, so we don't
-            # need the model's follow-up turn (which would just be an ack).
-            if tools_are_terminal:
+            # A terminal tool (e.g. log_activity) ends the turn: it's a side effect,
+            # so the model's follow-up would just be an ack. Non-terminal tools
+            # (propose_plan_adjustment) feed their result back so the model can
+            # continue — typically to then log the activity.
+            if hit_terminal:
                 break
 
             messages.append({"role": "user", "content": tool_results})

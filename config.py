@@ -19,6 +19,9 @@ DATA_DIR = PROJECT_ROOT / "data"
 OUTPUT_DIR = PROJECT_ROOT / "output"
 TRAINING_PLAN_PATH = DATA_DIR / "training_plan.json"
 RECENT_ACTIVITIES_PATH = DATA_DIR / "recent_activities.json"
+# Ledger of proposed/approved plan adjustments (propose->approve). Git-ignored:
+# it references the personal plan. The base plan file itself is never mutated.
+PLAN_ADJUSTMENTS_PATH = DATA_DIR / "plan_adjustments.json"
 
 # --- Athlete profile -------------------------------------------------------
 # FTP is the source of truth for all power-based load math (NP, IF, power TSS).

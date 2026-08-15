@@ -25,6 +25,7 @@ import json
 import time
 from datetime import datetime, timedelta
 
+import plan_adjustments
 import runlog
 import training_load
 from llm import get_llm_client
@@ -128,6 +129,25 @@ def _timing_facts(activity_date: str, recent: list) -> str:
         "### Recent activity timing (days relative to this activity — authoritative, "
         "do not recompute)\n" + "\n".join(lines) + "\n\n"
     )
+
+
+def _adjustment_facts(as_of_date: str | None) -> str:
+    """Surface plan adjustments in play for upcoming dates: APPROVED ones the
+    coach must honor over the base template, and PENDING ones already proposed
+    (so it doesn't propose the same thing again)."""
+    items = plan_adjustments.for_context(as_of_date)
+    if not items:
+        return ""
+    lines = ["## Plan adjustments in effect (honor APPROVED ones over the base weekly template)"]
+    for a in items:
+        lines.append(
+            f"- [{a.get('status', '?').upper()}] {a.get('for_date', '?')} — "
+            f"{a.get('summary', '')} ({a.get('type', '?')}, {a.get('impact', '?')})"
+        )
+    lines.append(
+        "Do NOT re-propose an adjustment that already appears here (approved or pending)."
+    )
+    return "\n".join(lines) + "\n\n"
 
 
 def _weather_facts(activity: dict) -> str:
@@ -262,10 +282,21 @@ Produce a structured analysis in Markdown with these sections:
 Be direct and specific; use the athlete's real numbers. If a metric is missing, \
 say so and work with what's available.
 
-After writing the analysis, call the `log_activity` tool exactly once to record \
-this activity in the athlete's history, including a short coach note in the \
-style of a training log. Calling the tool is your final action — do not write \
-any text after it."""
+Proposing a plan change (optional, and the exception — not every analysis): if \
+the evidence clearly warrants adapting the UPCOMING plan — deeply negative form \
+before a quality day, a repeated pattern the plan should absorb, an \
+illness/injury or overreach signal — you may call `propose_plan_adjustment` \
+ONCE to propose a single, specific change. It is a PROPOSAL the athlete must \
+approve; it does not change the plan, so frame it as a suggestion, not a done \
+deal. Prefer small, reversible (tier-0) changes. Most days need no adjustment — \
+if the training is on track, do NOT propose one. Any adjustments already listed \
+as in effect are authoritative: honor approved ones, and never re-propose an \
+adjustment that is already approved or pending.
+
+After writing the analysis (and the optional proposal), call the `log_activity` \
+tool exactly once to record this activity in the athlete's history, including a \
+short coach note in the style of a training log. log_activity is your final \
+action — do not write any text after it."""
 
 # A short hash of the system prompt. Any prompt change yields a new version tag,
 # so runs and eval scores can be grouped by exactly which prompt produced them —
@@ -306,6 +337,50 @@ LOG_ACTIVITY_TOOL = {
             },
         },
         "required": ["date", "name", "type", "sport", "note"],
+    },
+}
+
+# The action tool: PROPOSE (not apply) a change to the upcoming plan. This is the
+# agent's one lever to act — and it's gated. Calling it records a PENDING proposal
+# for the athlete to approve; it never edits the plan. It is conditional: the
+# model calls it only when the evidence clearly warrants an adjustment, which is
+# the exception, not the rule.
+PROPOSE_PLAN_ADJUSTMENT_TOOL = {
+    "name": "propose_plan_adjustment",
+    "description": (
+        "Propose ONE specific change to the UPCOMING training plan when the "
+        "evidence clearly warrants it — e.g. deeply negative form heading into a "
+        "quality day, a repeated pattern the plan should adapt to, or an "
+        "illness/injury signal. This is a PROPOSAL that requires the athlete's "
+        "approval; it does NOT change the plan. Most analyses need no adjustment, "
+        "so usually you will NOT call this. Never propose more than one, and only "
+        "when you can justify it from the data. Call this BEFORE log_activity."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "for_date": {
+                "type": "string",
+                "description": "Date (YYYY-MM-DD) the change applies to. Use the weekday calendar to pick it.",
+            },
+            "type": {
+                "type": "string",
+                "description": "Kind of change: reduce_intensity, move_session, add_rest, swap_sessions, extend_recovery, or note.",
+            },
+            "summary": {
+                "type": "string",
+                "description": "One concrete sentence: exactly what to change (e.g. 'Swap Thursday VO2 for easy Z2').",
+            },
+            "rationale": {
+                "type": "string",
+                "description": "Why, grounded in the athlete's data — form/TSB, load, recent sessions, the plan's intent.",
+            },
+            "impact": {
+                "type": "string",
+                "description": "'tier-0' for a small reversible tweak (shift/swap/rest); 'tier-1' for a structural change (alter a block or targets). Prefer tier-0.",
+            },
+        },
+        "required": ["for_date", "type", "summary", "rationale"],
     },
 }
 
@@ -367,6 +442,7 @@ def run_analysis(
         f"{date_facts}"
         f"{_calendar_facts(activity_date)}"
         f"{_load_facts(load_state)}"
+        f"{_adjustment_facts(activity_date)}"
         f"{_weather_facts(activity)}"
         "## Activity to analyze (metrics)\n"
         f"```json\n{json.dumps(activity, indent=2, default=str)}\n```\n\n"
@@ -377,20 +453,35 @@ def run_analysis(
         "Write the analysis using the required sections, then call log_activity."
     )
 
-    # The one tool: execute the history write (or a no-op in dry_run). The LLM
-    # adapter calls this whenever the model requests log_activity.
+    # Executes the tools the model requests: the history write (log_activity)
+    # and the plan-adjustment proposal. Both are no-ops in dry_run. New proposals
+    # are collected so we can surface them for approval in the delivered text.
+    proposed_this_run: list[dict] = []
+
     def tool_executor(name: str, tool_input: dict) -> dict:
-        if name != "log_activity":
-            return {"error": f"unknown tool {name}"}
-        if dry_run:
+        if name == "propose_plan_adjustment":
+            if dry_run:
+                if verbose:
+                    print("  [dry-run] propose_plan_adjustment called; NOT recorded:")
+                    print(json.dumps(tool_input, indent=2))
+                return {"status": "dry_run", "detail": "proposal not recorded"}
+            result = plan_adjustments.propose(tool_input)
+            if result.get("status") == "proposed":
+                proposed_this_run.append({**tool_input, "id": result.get("id")})
             if verbose:
-                print("  [dry-run] log_activity called; entry NOT written:")
-                print(json.dumps(tool_input, indent=2))
-            return {"status": "dry_run", "detail": "entry not written to history"}
-        result = append_activity(tool_input)
-        if verbose:
-            print(f"  Logged to history: {result}")
-        return result
+                print(f"  Plan adjustment {result.get('status')}: {result.get('id')}")
+            return result
+        if name == "log_activity":
+            if dry_run:
+                if verbose:
+                    print("  [dry-run] log_activity called; entry NOT written:")
+                    print(json.dumps(tool_input, indent=2))
+                return {"status": "dry_run", "detail": "entry not written to history"}
+            result = append_activity(tool_input)
+            if verbose:
+                print(f"  Logged to history: {result}")
+            return result
+        return {"error": f"unknown tool {name}"}
 
     # The provider seam runs the tool-use loop and returns the analysis + token
     # telemetry. log_activity is a terminal side effect (record and done), so we
@@ -400,10 +491,12 @@ def run_analysis(
     result = client.run_tool_loop(
         system=SYSTEM_PROMPT,
         user_message=user_message,
-        tools=[LOG_ACTIVITY_TOOL],
+        tools=[PROPOSE_PLAN_ADJUSTMENT_TOOL, LOG_ACTIVITY_TOOL],
         tool_executor=tool_executor,
         verbose=verbose,
-        tools_are_terminal=True,
+        # log_activity ends the loop; propose_plan_adjustment does not, so the
+        # model can propose an adjustment and then still log the activity.
+        terminal_tools={"log_activity"},
     )
     latency_s = round(time.monotonic() - started, 2)
 
@@ -420,4 +513,16 @@ def run_analysis(
             f"{latency_s}s"
         )
 
-    return result.text
+    # Surface any new proposal for approval, appended to the delivered analysis.
+    text_out = result.text
+    if proposed_this_run:
+        lines = ["\n\n---", "**⚠️ Proposed plan adjustment — needs your approval:**"]
+        for p in proposed_this_run:
+            lines.append(f"- {p.get('summary', '')} (for {p.get('for_date', '?')}) — id `{p.get('id')}`")
+        lines.append(
+            "Review: `python plan_adjustments.py`  ·  approve: "
+            "`python plan_adjustments.py --approve <id>`"
+        )
+        text_out += "\n".join(lines)
+
+    return text_out

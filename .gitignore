@@ -21,6 +21,7 @@ output/
 # The *.example.json templates are committed instead, to document the schema.
 data/training_plan.json
 data/recent_activities.json
+data/plan_adjustments.json
 
 # Your exported ride files
 data/*.fit
