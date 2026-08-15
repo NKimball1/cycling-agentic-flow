@@ -28,7 +28,13 @@ import requests
 
 import config
 import metrics
+import net
 import weather
+
+# All Strava calls go through one session that retries transient failures
+# (429 rate limits, 5xx, dropped connections) with backoff. Permanent errors
+# (401 bad token, 404) still surface immediately via raise_for_status().
+_SESSION = net.retrying_session(total=config.HTTP_RETRIES)
 
 AUTHORIZE_URL = "https://www.strava.com/oauth/authorize"
 TOKEN_URL = "https://www.strava.com/oauth/token"
@@ -75,7 +81,7 @@ def authorize_url() -> str:
 def exchange_code(code: str) -> dict:
     """One-time: trade the browser authorization code for tokens, and store them."""
     _require_credentials()
-    resp = requests.post(
+    resp = _SESSION.post(
         TOKEN_URL,
         data={
             "client_id": config.STRAVA_CLIENT_ID,
@@ -100,7 +106,7 @@ def get_access_token() -> str:
 
     # Access tokens last ~6 hours; refresh a minute early to be safe.
     if time.time() >= tokens.get("expires_at", 0) - 60:
-        resp = requests.post(
+        resp = _SESSION.post(
             TOKEN_URL,
             data={
                 "client_id": config.STRAVA_CLIENT_ID,
@@ -121,7 +127,7 @@ def get_access_token() -> str:
 
 # --- API calls -------------------------------------------------------------
 def _get(path: str, params: dict | None = None):
-    resp = requests.get(
+    resp = _SESSION.get(
         f"{API_BASE}{path}",
         headers={"Authorization": f"Bearer {get_access_token()}"},
         params=params,

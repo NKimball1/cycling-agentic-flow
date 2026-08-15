@@ -55,6 +55,14 @@ CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-5")
 # (varying the judge too would move two variables at once). See evaluate.py.
 EVAL_JUDGE_MODEL = os.getenv("EVAL_JUDGE_MODEL", "claude-sonnet-5")
 
+# --- Resilience knobs (unattended cron needs to shrug off transient failures) --
+# The Anthropic SDK retries transient errors (429/5xx/connection) internally with
+# backoff; we just raise the ceiling and cap per-request time so a run can't hang.
+ANTHROPIC_MAX_RETRIES = _int_env("ANTHROPIC_MAX_RETRIES") or 4
+ANTHROPIC_TIMEOUT = float(os.getenv("ANTHROPIC_TIMEOUT", "180"))
+# Retries for outbound HTTP (Strava, weather) via a retrying requests.Session.
+HTTP_RETRIES = _int_env("HTTP_RETRIES") or 4
+
 # --- Strava API (Phase 2) --------------------------------------------------
 # From your Strava API application at https://www.strava.com/settings/api.
 STRAVA_CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")

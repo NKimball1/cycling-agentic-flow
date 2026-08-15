@@ -77,7 +77,13 @@ class ClaudeClient:
     def __init__(self, model: str | None = None, max_tokens: int = 8000):
         self.model = model or config.CLAUDE_MODEL
         self.max_tokens = max_tokens
-        self._client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
+        # The SDK retries transient errors (429/5xx/connection) with exponential
+        # backoff on its own; we raise the retry ceiling and set a per-request
+        # timeout so an unattended run recovers from blips but can't hang forever.
+        self._client = anthropic.Anthropic(
+            max_retries=config.ANTHROPIC_MAX_RETRIES,
+            timeout=config.ANTHROPIC_TIMEOUT,
+        )  # reads ANTHROPIC_API_KEY from env
 
     @staticmethod
     def _to_anthropic_tools(tools: list[dict]) -> list[dict]:

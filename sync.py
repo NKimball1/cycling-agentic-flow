@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import traceback
 from datetime import datetime
 from pathlib import Path
 
@@ -139,11 +140,29 @@ def main() -> None:
 
     print(f"Found {len(new)} new activit{'y' if len(new) == 1 else 'ies'} to analyze.\n")
 
+    ok = failed = 0
     for a in new:
-        _process(a, args, synced)
+        try:
+            _process(a, args, synced)
+            ok += 1
+        except Exception as exc:
+            # Isolate failures: one activity blowing up (a persistent API error,
+            # bad data) must not sink the rest. It's left UNSYNCED, so the next
+            # run retries it automatically.
+            failed += 1
+            print(f"  ERROR: activity {a.get('id')} failed — left unsynced, will retry next run: {exc}")
+            traceback.print_exc()
 
-    print("Done.")
+    print(f"Done. {ok} processed, {failed} failed.")
 
 
 if __name__ == "__main__":
-    main()
+    # Top-level guard: a hard failure (e.g. Strava unreachable after retries)
+    # exits non-zero with a clear marker in cron.log, and the next cron run
+    # retries — nothing is marked synced on the way down.
+    try:
+        main()
+    except Exception as exc:
+        print(f"SYNC RUN FAILED: {exc}")
+        traceback.print_exc()
+        raise SystemExit(1)

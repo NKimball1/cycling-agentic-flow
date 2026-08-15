@@ -21,7 +21,13 @@ from __future__ import annotations
 
 import requests
 
+import net
+
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+
+# Retries transient blips; the whole fetch is still wrapped best-effort below, so
+# a persistent failure just means "no weather", never a crashed analysis.
+_SESSION = net.retrying_session()
 
 # The hourly fields we pull. apparent_temperature is the "feels like" that folds
 # in humidity + wind — the number that actually predicts heat/cold stress.
@@ -66,7 +72,7 @@ def get_weather(lat, lon, start_local_iso, timeout: int = 10) -> dict | None:
         hour = 12  # no usable time -> midday is a reasonable default
 
     try:
-        resp = requests.get(
+        resp = _SESSION.get(
             FORECAST_URL,
             params={
                 "latitude": lat,

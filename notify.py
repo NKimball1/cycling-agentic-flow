@@ -12,9 +12,21 @@ from __future__ import annotations
 
 import html
 import smtplib
+import socket
 from email.message import EmailMessage
 
 import config
+import net
+
+# Transient SMTP/connection failures worth a retry. Auth/recipient errors are
+# NOT here — they're permanent config problems that should surface immediately.
+_TRANSIENT_SMTP = (
+    smtplib.SMTPServerDisconnected,
+    smtplib.SMTPConnectError,
+    smtplib.SMTPHeloError,
+    socket.timeout,
+    OSError,
+)
 
 
 def _markdown_to_html(md_text: str) -> str:
@@ -58,9 +70,12 @@ def send_email(subject: str, markdown_body: str) -> None:
     msg.set_content(markdown_body)  # plain-text part (the raw Markdown, still readable)
     msg.add_alternative(_wrap_html(_markdown_to_html(markdown_body)), subtype="html")
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-        smtp.login(config.GMAIL_ADDRESS, config.GMAIL_APP_PASSWORD)
-        smtp.send_message(msg)
+    def _send() -> None:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as smtp:
+            smtp.login(config.GMAIL_ADDRESS, config.GMAIL_APP_PASSWORD)
+            smtp.send_message(msg)
+
+    net.call_with_retries(_send, attempts=3, base_delay=2.0, retry_on=_TRANSIENT_SMTP, label="email send")
 
 
 def notify(subject: str, markdown_body: str, verbose: bool = True) -> None:

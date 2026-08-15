@@ -123,15 +123,27 @@ async def _destination():
 @tasks.loop(seconds=POLL_SECONDS)
 async def announce_pending() -> None:
     """Send any pending proposal that hasn't been sent yet (DM or channel), then
-    record its message id on the ledger so it's never sent twice."""
-    target = await _destination()
+    record its message id on the ledger so it's never sent twice.
+
+    Every step is guarded: a transient Discord error on one proposal must not
+    kill the loop (discord.ext.tasks stops a loop on an unhandled exception),
+    which would silently halt all future delivery until a restart."""
+    try:
+        target = await _destination()
+    except Exception as exc:
+        print(f"(could not resolve Discord destination: {exc})")
+        return
     if target is None:
         return
     for adj in plan_adjustments.pending():
         if adj.get("discord_message_id"):
             continue
-        message = await target.send(embed=_embed(adj), view=ApprovalView(adj["id"]))
-        plan_adjustments.annotate(adj["id"], discord_message_id=message.id)
+        try:
+            message = await target.send(embed=_embed(adj), view=ApprovalView(adj["id"]))
+            plan_adjustments.annotate(adj["id"], discord_message_id=message.id)
+        except Exception as exc:
+            # Leave it un-annotated so the next poll retries this proposal.
+            print(f"(failed to send proposal {adj.get('id')}, will retry: {exc})")
 
 
 @announce_pending.before_loop
