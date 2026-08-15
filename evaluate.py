@@ -95,14 +95,35 @@ def judge(activity: dict, analysis: str, rubric: str, plan: dict, recent: list,
 DEFAULT_COMPARE_MODELS = ["claude-haiku-4-5", "claude-sonnet-5", "claude-opus-5"]
 
 
+def _check_proposal(expect, proposals: list) -> tuple[bool, str, str]:
+    """Deterministic proposal-decision check. `expect` is the case's
+    `_expect_proposal` (falsy = should NOT propose; truthy/dict = should propose,
+    optionally of a given `type`). Returns (correct?, expected_str, got_str).
+
+    This is behavioral correctness — checked in code, not by the LLM judge — so
+    over-proposing (fires on a normal day) and under-proposing (misses a clear
+    flag) are caught precisely and without eval noise."""
+    made = len(proposals) > 0
+    expected = bool(expect)
+    exp_type = expect.get("type") if isinstance(expect, dict) else None
+    correct = (made == expected)
+    if expected and made and exp_type:
+        correct = correct and any(p.get("type") == exp_type for p in proposals)
+    expected_str = (exp_type or "yes") if expected else "none"
+    got_str = (proposals[0].get("type", "?") if made else "none")
+    return correct, expected_str, got_str
+
+
 def run_eval(coach_model, rubric, plan, recent, cases, verbose=True):
     """Run every case under `coach_model` (judge stays fixed), score + log each.
 
-    Returns (total_score, max_score, telemetry) where telemetry is avg tokens +
-    latency for this model's runs, read back from the run log.
+    Returns (total_score, max_score, telemetry, proposal_correct, proposal_total).
+    Telemetry is avg tokens + latency for this model's runs; the proposal counts
+    are the deterministic propose-or-not accuracy (separate from the rubric).
     """
     since = datetime.now().isoformat(timespec="seconds")
     total = max_total = 0.0
+    prop_correct = prop_total = 0
     for path in cases:
         name = path.stem
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -113,8 +134,9 @@ def run_eval(coach_model, rubric, plan, recent, cases, verbose=True):
         load_state = raw.get("_load_state") or training_load.compute_load(
             recent, activity.get("date"), activity_tss=activity.get("load_tss")
         )
+        capture: dict = {}
         try:
-            analysis = run_analysis(activity, verbose=False, dry_run=True, model=coach_model, load_state=load_state)
+            analysis = run_analysis(activity, verbose=False, dry_run=True, model=coach_model, load_state=load_state, capture=capture)
             verdict = judge(activity, analysis, rubric, plan, recent, _weekday(activity.get("date")), load_state)
         except Exception as exc:
             # e.g. a model this account can't access — skip it, don't crash the batch.
@@ -125,11 +147,18 @@ def run_eval(coach_model, rubric, plan, recent, cases, verbose=True):
         m = float(verdict.get("max_total", 18))
         total += t
         max_total += m
+        ok, exp_str, got_str = _check_proposal(raw.get("_expect_proposal"), capture.get("proposals", []))
+        prop_total += 1
+        prop_correct += 1 if ok else 0
         runlog.log_eval(name, PROMPT_VERSION, coach_model, t, m, verdict.get("verdict", ""), json.dumps(verdict))
         if verbose:
             pct = (100 * t / m) if m else 0
-            print(f"  {name:<22} {t:.0f}/{m:.0f}  ({pct:.0f}%)  {verdict.get('verdict', '')}")
-    return total, max_total, runlog.model_stats(coach_model, since)
+            mark = "ok" if ok else "XX"
+            print(
+                f"  {name:<22} {t:.0f}/{m:.0f}  ({pct:.0f}%)  "
+                f"proposal[{mark}] exp={exp_str}/got={got_str}  {verdict.get('verdict', '')}"
+            )
+    return total, max_total, runlog.model_stats(coach_model, since), prop_correct, prop_total
 
 
 def main() -> None:
@@ -163,13 +192,14 @@ def main() -> None:
             print(f"  running {model} ...")
             rows.append((model, *run_eval(model, rubric, plan, recent, cases, verbose=False)))
 
-        print(f"\n{'model':<20}{'score':>16}{'avg tokens':>13}{'avg latency':>13}")
-        print("-" * 62)
-        for model, total, max_total, stats in rows:
+        print(f"\n{'model':<20}{'score':>16}{'proposals':>11}{'avg tokens':>13}{'avg latency':>13}")
+        print("-" * 73)
+        for model, total, max_total, stats, pc, pt in rows:
             pct = f"{100 * total / max_total:.0f}% ({total:.0f}/{max_total:.0f})" if max_total else "-"
+            prop = f"{pc}/{pt}" if pt else "-"
             tok = f"{stats['avg_tokens']:.0f}" if stats["avg_tokens"] else "-"
             lat = f"{stats['avg_latency']:.1f}s" if stats["avg_latency"] else "-"
-            print(f"{model:<20}{pct:>16}{tok:>13}{lat:>13}")
+            print(f"{model:<20}{pct:>16}{prop:>11}{tok:>13}{lat:>13}")
         print(f"\nprompt {PROMPT_VERSION} | logged to runs.db. Pick your spot on the quality/cost/speed curve.")
         return
 
@@ -178,10 +208,11 @@ def main() -> None:
         f"Evaluating {len(cases)} cases | prompt {PROMPT_VERSION} | coach {config.CLAUDE_MODEL} "
         f"| judge {config.EVAL_JUDGE_MODEL}\n"
     )
-    total, max_total, stats = run_eval(config.CLAUDE_MODEL, rubric, plan, recent, cases, verbose=True)
+    total, max_total, stats, pc, pt = run_eval(config.CLAUDE_MODEL, rubric, plan, recent, cases, verbose=True)
     if max_total:
         print(
             f"\nOVERALL: {total:.0f}/{max_total:.0f} ({100 * total / max_total:.0f}%) "
+            f"| proposals {pc}/{pt} correct "
             f"| avg {(stats['avg_tokens'] or 0):.0f} tokens, {(stats['avg_latency'] or 0):.1f}s "
             f"| prompt {PROMPT_VERSION} | model {config.CLAUDE_MODEL}"
         )

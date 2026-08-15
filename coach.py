@@ -391,6 +391,7 @@ def run_analysis(
     dry_run: bool = False,
     model: str | None = None,
     load_state: dict | None = None,
+    capture: dict | None = None,
 ) -> str:
     """Analyze one activity (given its metrics dict), log it, return the Markdown.
 
@@ -456,10 +457,12 @@ def run_analysis(
     # Executes the tools the model requests: the history write (log_activity)
     # and the plan-adjustment proposal. Both are no-ops in dry_run. New proposals
     # are collected so we can surface them for approval in the delivered text.
-    proposed_this_run: list[dict] = []
+    proposal_calls: list[dict] = []   # every propose call (captured for eval too)
+    proposed_this_run: list[dict] = []  # newly-recorded proposals (for the footer)
 
     def tool_executor(name: str, tool_input: dict) -> dict:
         if name == "propose_plan_adjustment":
+            proposal_calls.append(tool_input)
             if dry_run:
                 if verbose:
                     print("  [dry-run] propose_plan_adjustment called; NOT recorded:")
@@ -524,5 +527,10 @@ def run_analysis(
             "`python plan_adjustments.py --approve <id>`"
         )
         text_out += "\n".join(lines)
+
+    # Expose the proposal decision to callers that ask (the eval harness), so
+    # propose-or-not can be scored deterministically against the case's label.
+    if capture is not None:
+        capture["proposals"] = proposal_calls
 
     return text_out

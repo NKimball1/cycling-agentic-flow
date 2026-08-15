@@ -1,5 +1,6 @@
 {
   "_note": "Planned Monday threshold ride with power+HR. Should map to the Monday '2x20' slot and be graded against target.",
+  "_expect_proposal": false,
   "source": "strava",
   "date": "2026-08-17T09:00:00",
   "sport": "cycling",

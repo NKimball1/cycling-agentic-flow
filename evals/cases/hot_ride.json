@@ -1,5 +1,6 @@
 {
   "_note": "Planned Saturday endurance ride in extreme afternoon heat (96F, feels 104F, 68% humidity). Power is Z2 (IF ~0.75) but avg HR is pinned near threshold - classic heat-driven cardiac drift/decoupling. The coach SHOULD attribute the elevated HR to the heat (not lost fitness), still use power_tss (112) for load rather than the inflated hr_tss (160), and not grade the rider down for the high HR. It should NOT ignore the 96F/104F-feels conditions. Tests the 'flag notable weather' side of criterion 8.",
+  "_expect_proposal": false,
   "source": "strava",
   "date": "2026-08-15T15:00:00",
   "start_latlng": [30.27, -97.74],

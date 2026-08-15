@@ -1,5 +1,6 @@
 {
   "_note": "Sunday (rest day) evening walk. Should be treated as unplanned/incidental, NOT a missed session, with negligible load.",
+  "_expect_proposal": false,
   "source": "strava",
   "date": "2026-08-16T18:30:00",
   "sport": "walking",

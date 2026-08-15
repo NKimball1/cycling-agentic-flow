@@ -11,6 +11,7 @@
     "warming_up": false,
     "seed_value": 70.0
   },
+  "_expect_proposal": { "type": "reduce_intensity" },
   "source": "strava",
   "date": "2026-08-18T09:00:00",
   "sport": "cycling",
