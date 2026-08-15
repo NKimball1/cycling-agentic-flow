@@ -93,6 +93,27 @@ def propose(fields: dict) -> dict:
     return {"status": "proposed", "id": record["id"], "detail": "pending athlete approval"}
 
 
+def get(adj_id: str) -> dict | None:
+    """Fetch one adjustment record by id, or None."""
+    for a in load():
+        if a.get("id") == adj_id:
+            return a
+    return None
+
+
+def annotate(adj_id: str, **fields) -> bool:
+    """Merge extra fields into a record (e.g. the Discord message id the bot
+    posted it as). Returns True if found. Keeps delivery bookkeeping in the
+    ledger so it survives a bot restart."""
+    items = load()
+    for a in items:
+        if a.get("id") == adj_id:
+            a.update(fields)
+            _save(items)
+            return True
+    return False
+
+
 def set_status(adj_id: str, status: str) -> bool:
     """Approve/reject a proposal by id. Returns True if found."""
     items = load()

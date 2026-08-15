@@ -64,5 +64,15 @@ GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Where analyses are sent (defaults to your own Gmail address).
 NOTIFY_TO = os.getenv("NOTIFY_TO") or GMAIL_ADDRESS
 
+# --- Discord approver bot (interactive plan-adjustment approval) ------------
+# A persistent bot (discord_bot.py) sends pending plan adjustments with
+# Approve/Reject buttons, so you approve from your phone instead of SSH.
+DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+# YOUR Discord user id (right-click your name -> Copy ID). The bot DMs proposals
+# here by default, and only this user may approve/reject (the auth gate).
+DISCORD_APPROVER_ID = int(os.getenv("DISCORD_APPROVER_ID", "0")) or None
+# Optional: set a channel id to post proposals in a channel INSTEAD of DMing you.
+DISCORD_CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID", "0")) or None
+
 # Output units for the whole app. You chose imperial.
 UNITS = "imperial"

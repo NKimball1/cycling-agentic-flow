@@ -12,3 +12,7 @@ requests>=2.31
 
 # Render the Markdown analysis as HTML for email delivery (Phase 3).
 markdown>=3.5
+
+# Discord approver bot (discord_bot.py) — approve plan adjustments from your
+# phone with buttons. Only needed if you run the bot; the rest works without it.
+discord.py>=2.3
