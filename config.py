@@ -13,6 +13,18 @@ from dotenv import load_dotenv
 # Load .env from the project root into os.environ.
 load_dotenv()
 
+
+def _int_env(name: str) -> int | None:
+    """Parse an env var as an int, treating missing OR blank as None. A blank
+    line in .env (e.g. `DISCORD_CHANNEL_ID=`) means 'unset' — not a crash."""
+    value = (os.getenv(name) or "").strip()
+    if not value:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
 # --- Paths -----------------------------------------------------------------
 PROJECT_ROOT = Path(__file__).parent
 DATA_DIR = PROJECT_ROOT / "data"
@@ -70,9 +82,9 @@ NOTIFY_TO = os.getenv("NOTIFY_TO") or GMAIL_ADDRESS
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 # YOUR Discord user id (right-click your name -> Copy ID). The bot DMs proposals
 # here by default, and only this user may approve/reject (the auth gate).
-DISCORD_APPROVER_ID = int(os.getenv("DISCORD_APPROVER_ID", "0")) or None
+DISCORD_APPROVER_ID = _int_env("DISCORD_APPROVER_ID")
 # Optional: set a channel id to post proposals in a channel INSTEAD of DMing you.
-DISCORD_CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID", "0")) or None
+DISCORD_CHANNEL_ID = _int_env("DISCORD_CHANNEL_ID")
 
 # Output units for the whole app. You chose imperial.
 UNITS = "imperial"
