@@ -25,6 +25,7 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
+import alerts
 import config
 import storage
 import strava
@@ -139,7 +140,8 @@ def main() -> None:
 
     print(f"Found {len(new)} new activit{'y' if len(new) == 1 else 'ies'} to analyze.\n")
 
-    ok = failed = 0
+    ok = 0
+    failures: list[tuple] = []
     for a in new:
         try:
             _process(a, args, synced)
@@ -148,11 +150,19 @@ def main() -> None:
             # Isolate failures: one activity blowing up (a persistent API error,
             # bad data) must not sink the rest. It's left UNSYNCED, so the next
             # run retries it automatically.
-            failed += 1
+            failures.append((a.get("id"), repr(exc)))
             print(f"  ERROR: activity {a.get('id')} failed — left unsynced, will retry next run: {exc}")
             traceback.print_exc()
 
-    print(f"Done. {ok} processed, {failed} failed.")
+    print(f"Done. {ok} processed, {len(failures)} failed.")
+
+    # Make partial failures visible (once per distinct failure, not every run).
+    if failures:
+        sig = "activities|" + "|".join(f"{i}:{e}" for i, e in failures)
+        body = "\n".join(f"- activity {i}: {e}" for i, e in failures)
+        alerts.alert_once(sig, f"{len(failures)} activity analysis(es) failed", body)
+    else:
+        alerts.alert_once(None)  # clean run — re-arm alerts
 
 
 if __name__ == "__main__":
@@ -164,4 +174,10 @@ if __name__ == "__main__":
     except Exception as exc:
         print(f"SYNC RUN FAILED: {exc}")
         traceback.print_exc()
+        # Alert on a whole-run failure (Strava unreachable after retries, etc.),
+        # de-duped so an ongoing outage doesn't ping every 5 minutes.
+        try:
+            alerts.alert_once(f"run|{exc!r}", "Sync run failed", f"{exc!r}\n\nSee cron.log for the traceback.")
+        except Exception:
+            pass
         raise SystemExit(1)

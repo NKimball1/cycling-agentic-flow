@@ -4,6 +4,7 @@
 
 # Local sync state
 .synced_ids.json
+.alert_state.json
 
 # Observability / eval data (accumulated telemetry — not the eval definitions)
 runs.db
