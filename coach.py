@@ -132,20 +132,23 @@ def _timing_facts(activity_date: str, recent: list) -> str:
 
 
 def _adjustment_facts(as_of_date: str | None) -> str:
-    """Surface plan adjustments in play for upcoming dates: APPROVED ones the
-    coach must honor over the base template, and PENDING ones already proposed
-    (so it doesn't propose the same thing again)."""
+    """Surface plan adjustments on record for upcoming dates so the coach honors
+    APPROVED ones and doesn't re-pitch PENDING (awaiting a decision) or REJECTED
+    (already declined) ones."""
     items = plan_adjustments.for_context(as_of_date)
     if not items:
         return ""
-    lines = ["## Plan adjustments in effect (honor APPROVED ones over the base weekly template)"]
+    lines = ["## Plan adjustments on record for upcoming dates"]
     for a in items:
         lines.append(
             f"- [{a.get('status', '?').upper()}] {a.get('for_date', '?')} — "
             f"{a.get('summary', '')} ({a.get('type', '?')}, {a.get('impact', '?')})"
         )
     lines.append(
-        "Do NOT re-propose an adjustment that already appears here (approved or pending)."
+        "Honor APPROVED adjustments over the base weekly template. Do NOT re-propose "
+        "anything already listed: PENDING items are awaiting the athlete's decision, "
+        "and REJECTED items were already declined — only revisit one if the situation "
+        "has clearly, materially changed since."
     )
     return "\n".join(lines) + "\n\n"
 
@@ -289,9 +292,10 @@ illness/injury or overreach signal — you may call `propose_plan_adjustment` \
 ONCE to propose a single, specific change. It is a PROPOSAL the athlete must \
 approve; it does not change the plan, so frame it as a suggestion, not a done \
 deal. Prefer small, reversible (tier-0) changes. Most days need no adjustment — \
-if the training is on track, do NOT propose one. Any adjustments already listed \
-as in effect are authoritative: honor approved ones, and never re-propose an \
-adjustment that is already approved or pending.
+if the training is on track, do NOT propose one. Any adjustments already on \
+record are shown to you: honor approved ones (they override the base template), \
+and never re-propose one that is already approved, pending, or previously \
+rejected — unless the situation has clearly, materially changed since.
 
 After writing the analysis (and the optional proposal), call the `log_activity` \
 tool exactly once to record this activity in the athlete's history, including a \

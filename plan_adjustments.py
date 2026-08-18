@@ -40,7 +40,12 @@ from datetime import datetime
 import config
 import storage
 
-_ACTIVE = ("pending", "approved")  # statuses that still "count" for dedupe/context
+_ACTIVE = ("pending", "approved")  # statuses that block a duplicate proposal (dedupe)
+# What the coach should SEE for upcoming dates. Includes "rejected" so the coach
+# knows not to re-pitch something the athlete already declined — while dedupe
+# above stays pending/approved-only, so a genuinely re-warranted idea can still
+# be proposed if the model judges the situation has materially changed.
+_CONTEXT = ("pending", "approved", "rejected")
 
 
 def load() -> list:
@@ -130,13 +135,15 @@ def pending() -> list:
 
 
 def for_context(as_of_date: str | None) -> list:
-    """Adjustments relevant when analyzing an activity on `as_of_date`: everything
-    still active (pending or approved) whose target date is that day or later, so
-    the coach honors approved changes and doesn't re-propose pending ones."""
+    """Adjustments the coach should know about when analyzing an activity on
+    `as_of_date`: pending, approved, or rejected items whose target date is that
+    day or later. Approved ones are honored; pending/rejected ones tell the coach
+    not to re-propose (a still-future rejection was already declined). Past-dated
+    items drop out — they can't be adjusted anymore."""
     cutoff = (as_of_date or "")[:10]
     out = []
     for a in load():
-        if a.get("status") not in _ACTIVE:
+        if a.get("status") not in _CONTEXT:
             continue
         if not cutoff or (a.get("for_date") or "")[:10] >= cutoff:
             out.append(a)
