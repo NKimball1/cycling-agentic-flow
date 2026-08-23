@@ -1,5 +1,7 @@
 # Cycling Agentic Flow
 
+[![tests](https://github.com/NKimball1/cycling-agentic-flow/actions/workflows/tests.yml/badge.svg)](https://github.com/NKimball1/cycling-agentic-flow/actions/workflows/tests.yml)
+
 A workflow that analyzes your training activities — rides, runs, and walks —
 against your training plan. Plain Python gathers the activity's metrics, your
 plan, and your recent history; Claude does the parts that actually need judgment:
