@@ -82,8 +82,18 @@ def propose(fields: dict) -> dict:
             return {"status": "duplicate", "id": existing["id"], "detail": "a matching proposal already exists"}
 
     created = datetime.now().isoformat(timespec="seconds")
+    # Guarantee a unique id: the base id is a hash of (date|type|summary)+minute,
+    # so an identical proposal re-made in the same minute (e.g. after a rejection)
+    # would otherwise collide. Disambiguate with a suffix if needed.
+    existing_ids = {i.get("id") for i in items}
+    adj_id = _make_id(fields, created)
+    if adj_id in existing_ids:
+        suffix = 2
+        while f"{adj_id}-{suffix}" in existing_ids:
+            suffix += 1
+        adj_id = f"{adj_id}-{suffix}"
     record = {
-        "id": _make_id(fields, created),
+        "id": adj_id,
         "created": created,
         "for_date": for_date,
         "type": kind,
