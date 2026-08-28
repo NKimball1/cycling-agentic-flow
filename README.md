@@ -188,3 +188,16 @@ Anything unavailable comes back as `null` and the coach works with what's there.
 - **Next:** schedule `sync.py` (Windows Task Scheduler) so it runs unattended;
   optionally add push/SMS channels, or model-driven selective retrieval once the
   history grows large.
+
+## Design decisions & operations
+
+Longer-form engineering notes live in [`docs/`](docs/):
+
+- [**ADR 0001 — Prompt caching & context ordering**](docs/decisions/0001-prompt-caching-and-ordering.md)
+  — how the prompt is ordered, and why prompt caching was considered and
+  deliberately skipped for this workload (the tool loop almost never loops, so
+  the reuse that makes caching pay off isn't there).
+- [**Incident 2026-08-20 — instance wedged (OOM)**](docs/incidents/2026-08-20-oom-wedge.md)
+  — postmortem of the first production outage: root cause (no swap on a 512 MB
+  box), recovery, and the swap fix. No data lost, thanks to idempotent syncing
+  and atomic state-file writes.
