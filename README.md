@@ -181,13 +181,41 @@ Anything unavailable comes back as `null` and the coach works with what's there.
 
 ## Roadmap
 
+**Original phases — all shipped:**
+
 - **Phase 1:** manual trigger, local `.fit`, multi-sport analysis, auto-log. ✅
 - **Phase 2:** Strava OAuth, new-activity detection, map API JSON to the shared
   metrics contract, `sync.py`. ✅
 - **Phase 3:** email delivery of the finished analysis (`notify.py`). ✅
-- **Next:** schedule `sync.py` (Windows Task Scheduler) so it runs unattended;
-  optionally add push/SMS channels, or model-driven selective retrieval once the
-  history grows large.
+
+**Deployed & running unattended** on an AWS Lightsail VM via cron (5-minute poll). ✅
+
+**Beyond the phases — built since:**
+
+- **LLM-agnostic seam** — all model access behind an `LLMClient` interface; a new
+  provider is one adapter, no business-logic changes. ✅
+- **Rolling training-load state** — Fitness / Fatigue / Form (CTL/ATL/TSB) derived
+  from history each run and injected as context. ✅
+- **Weather enrichment** — historical conditions for the ride (Open-Meteo, no key),
+  used proportionately. ✅
+- **Eval & observability** — a SQLite run log, an LLM-as-judge rubric, prompt
+  versioning, a deterministic propose-or-not check, and a model benchmark
+  (`--compare`) scoring quality × cost × latency. ✅
+- **Plan adjustments (the agent acts)** — the coach *proposes* plan changes when
+  the data warrants; you approve them, gated by a human. ✅
+- **Interactive approval** — a Discord bot DMs proposals with Approve / Reject
+  buttons (`discord_bot.py`, runs as a systemd service). ✅
+- **Production hardening** — retry-with-backoff on transient failures, per-activity
+  isolation, atomic state-file writes, and de-duped failure alerts. ✅
+- **Tests & CI** — a `pytest` suite run on every push via GitHub Actions. ✅
+
+**Ideas, not yet built:**
+
+- More notification channels (SMS / push).
+- Tier-1 (structural) plan adjustments, beyond the current small/reversible ones.
+- More eval cases, especially "should-propose" scenarios.
+- Move the adjustments ledger to SQLite (removes a small read/write race).
+- Lightweight memory/health monitoring on the VM.
 
 ## Design decisions & operations
 
