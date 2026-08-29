@@ -12,7 +12,7 @@ Two ways in — a local `.fit` file (`analyze.py`) or an automatic Strava pull
 (`sync.py`) — both feed the same analysis core, and the finished write-up can be
 emailed to you.
 
-## How it's built (deterministic gather, one judgment step, one tool)
+## How it's built (deterministic gather, a judgment step, a gated action)
 
 The reflex with LLM projects is to reach for tools and orchestration everywhere.
 The better instinct is the **simplest tier that does each job**:
@@ -27,22 +27,33 @@ and the history, so that's plain Python ([`fit_parser.py`](fit_parser.py),
 is the judgment step, so it goes to Claude ([`coach.py`](coach.py)).
 
 ```
-fit_parser + plan_loader ── gather ──▶ coach.py ──▶ analysis  ──▶ log_activity tool
-   (deterministic Python)              (Claude: the judgment step)   (writes history)
+fit_parser + plan_loader ── gather ──▶ coach.py ──▶ analysis
+   (deterministic Python)              (Claude: judgment)
+                                          │
+                                          ├─▶ log_activity             (always: writes history)
+                                          └─▶ propose_plan_adjustment  (only when warranted; gated by approval)
 ```
 
-**Why there's exactly one tool.** A tool earns its place for one of two reasons:
+**The two tools, and why each earns its place.** A tool earns its place for one of
+three reasons; two apply here (the third doesn't — yet):
 
-1. **Selective retrieval** — the model must decide *what* data to fetch. Not here
-   yet: we always fetch the same three things. (Even the Strava sync just pulls one
-   activity and hands it off deterministically.) This becomes justified only once
-   the history is a large live feed and "find me comparable rides" is a real choice.
-2. **A side-effecting write** — persisting the analyzed activity to your history.
+1. **A side-effecting write** — persisting the analyzed activity to your history.
    The model doesn't decide *whether* to log (it always does); the `log_activity`
-   tool exists to give that write a typed, validated boundary while *our* code
-   performs the actual file write. That's the tool in this phase.
+   tool gives that write a typed, validated boundary while *our* code performs the
+   actual file write.
+2. **A gated action the model chooses to take** — when the data clearly warrants it
+   (e.g. deep fatigue before a quality day), the coach calls
+   `propose_plan_adjustment` to *propose* a change to the upcoming plan. This is the
+   genuinely agentic step: the model decides *whether* to act. It never edits the
+   plan directly — it writes a pending proposal you approve (in Discord, or via
+   CLI), and only approved changes feed back into future analyses.
+3. **Selective retrieval** — the model deciding *what* to fetch. Not here yet: we
+   always fetch the same three things, so gathering stays deterministic. It becomes
+   justified only once the history is a large live feed and "find me comparable
+   rides" is a real choice.
 
-So the tool-use loop is back, but minimal and justified — not ceremony.
+So the tool-use loop is minimal and justified — a validated write boundary plus one
+gated, model-decided action — not ceremony.
 
 **Two swappable seams, same pattern.** The codebase is agnostic on two axes, each
 behind a shared contract:
