@@ -236,6 +236,9 @@ Longer-form engineering notes live in [`docs/`](docs/):
   — how the prompt is ordered, and why prompt caching was considered and
   deliberately skipped for this workload (the tool loop almost never loops, so
   the reuse that makes caching pay off isn't there).
+- [**ADR 0002 — Derive rolling load state from history**](docs/decisions/0002-derive-load-state-vs-store.md)
+  — why Fitness/Fatigue/Form is recomputed from history each run instead of stored
+  as a running counter (idempotent, self-healing on data fixes, crash-safe).
 - [**Incident 2026-08-20 — instance wedged (OOM)**](docs/incidents/2026-08-20-oom-wedge.md)
   — postmortem of the first production outage: root cause (no swap on a 512 MB
   box), recovery, and the swap fix. No data lost, thanks to idempotent syncing
