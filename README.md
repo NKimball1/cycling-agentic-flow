@@ -242,6 +242,10 @@ Longer-form engineering notes live in [`docs/`](docs/):
 - [**ADR 0003 — A separate adjustment ledger**](docs/decisions/0003-adjustment-ledger-vs-mutating-plan.md)
   — why the agent proposes into its own ledger instead of editing the plan, keeping
   the source of truth human-owned and every action auditable and reversible.
+- [**ADR 0004 — Deterministic check vs. LLM judge**](docs/decisions/0004-deterministic-check-vs-llm-judge.md)
+  — why the propose-or-not decision is graded in code (exact, noise-free) while
+  subjective analysis quality goes to the LLM judge — matching the measurement to
+  the property.
 - [**Incident 2026-08-20 — instance wedged (OOM)**](docs/incidents/2026-08-20-oom-wedge.md)
   — postmortem of the first production outage: root cause (no swap on a 512 MB
   box), recovery, and the swap fix. No data lost, thanks to idempotent syncing
