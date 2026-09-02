@@ -24,8 +24,6 @@ import sys
 import time
 from pathlib import Path
 
-import requests
-
 import config
 import metrics
 import net

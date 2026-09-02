@@ -19,8 +19,6 @@ is enrichment — it must never break an analysis.
 
 from __future__ import annotations
 
-import requests
-
 import net
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
