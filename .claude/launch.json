@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "routes",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8902", "--directory", "C:/Users/nicks/OneDrive/Desktop/cycling agentic flow/output/routes"],
+      "port": 8902
+    },
+    {
       "name": "report",
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8901", "--directory", "C:/Users/nicks/OneDrive/Desktop/Better AI Playlists/docs"],
