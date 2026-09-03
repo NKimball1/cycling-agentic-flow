@@ -4,7 +4,7 @@
     {
       "name": "routes",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8902", "--directory", "C:/Users/nicks/OneDrive/Desktop/cycling agentic flow/output/routes"],
+      "runtimeArgs": ["-m", "http.server", "8902", "--directory", "C:/Users/nicks/OneDrive/Desktop/route gen ai/output/routes"],
       "port": 8902
     },
     {
