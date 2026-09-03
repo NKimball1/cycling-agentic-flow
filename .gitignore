@@ -37,3 +37,5 @@ data/*.backup*.json
 
 # Local Claude Code settings (machine-specific)
 .claude/settings.local.json
+# Preview-server config with machine-specific absolute paths (kept local).
+.claude/launch.json
