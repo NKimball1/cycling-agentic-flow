@@ -10,6 +10,7 @@ stay for history rather than being deleted.
 | [0002](0002-derive-load-state-vs-store.md) | Derive rolling load state (CTL/ATL/TSB) from history instead of storing a counter | Accepted |
 | [0003](0003-adjustment-ledger-vs-mutating-plan.md) | A separate adjustment ledger — the agent proposes, never edits the plan | Accepted |
 | [0004](0004-deterministic-check-vs-llm-judge.md) | Grade the propose/not decision in code; keep the LLM judge for subjective quality | Accepted |
+| [0005](0005-provider-agnostic-llm-seam.md) | A provider-agnostic LLM seam — talk to an interface, not a vendor SDK | Accepted |
 
 Together these cover the system's spine: how context is built, how rolling state is
 kept, how the agent takes action safely, and how its behavior is measured.

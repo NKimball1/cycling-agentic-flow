@@ -246,6 +246,9 @@ Longer-form engineering notes live in [`docs/`](docs/):
   — why the propose-or-not decision is graded in code (exact, noise-free) while
   subjective analysis quality goes to the LLM judge — matching the measurement to
   the property.
+- [**ADR 0005 — A provider-agnostic LLM seam**](docs/decisions/0005-provider-agnostic-llm-seam.md)
+  — why model access goes through an `LLMClient` interface (build the seam, not
+  every adapter), so swapping vendors is one file and telemetry stays neutral.
 - [**Incident 2026-08-20 — instance wedged (OOM)**](docs/incidents/2026-08-20-oom-wedge.md)
   — postmortem of the first production outage: root cause (no swap on a 512 MB
   box), recovery, and the swap fix. No data lost, thanks to idempotent syncing
