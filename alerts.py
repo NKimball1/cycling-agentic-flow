@@ -74,23 +74,31 @@ def send(subject: str, body: str) -> None:
         print(f"  (email alert failed: {exc})")
 
 
-def _load_signature() -> str | None:
+def _load_state() -> dict:
+    """The dedup state: a map of {key: last-alerted signature}. Namespacing by key
+    lets independent alert streams (e.g. run failures vs. delivery failures)
+    de-dupe separately instead of clobbering each other."""
     try:
-        return json.loads(_STATE_PATH.read_text(encoding="utf-8")).get("signature")
+        state = json.loads(_STATE_PATH.read_text(encoding="utf-8"))
+        return state if isinstance(state, dict) else {}
     except Exception:
-        return None
+        return {}
 
 
-def alert_once(signature: str | None, subject: str = "", body: str = "") -> None:
-    """Alert only when `signature` differs from the last one we alerted on, so a
-    failure that repeats every run pings you just once. Pass signature=None to
-    clear the state after a clean run (re-arming future alerts)."""
-    last = _load_signature()
+def alert_once(signature: str | None, subject: str = "", body: str = "", key: str = "default") -> None:
+    """Alert only when `signature` differs from the last one alerted for `key`, so
+    a failure that repeats every run pings you just once. Pass signature=None to
+    clear that key after a clean run (re-arming future alerts). Different `key`s
+    are tracked independently."""
+    state = _load_state()
+    last = state.get(key)
     if signature is None:
         if last is not None:
-            storage.write_json_atomic(_STATE_PATH, {"signature": None})
+            state[key] = None
+            storage.write_json_atomic(_STATE_PATH, state)
         return
     if signature == last:
         return  # same failure as last time — already told you
     send(subject, body)
-    storage.write_json_atomic(_STATE_PATH, {"signature": signature})
+    state[key] = signature
+    storage.write_json_atomic(_STATE_PATH, state)

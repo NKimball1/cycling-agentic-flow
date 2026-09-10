@@ -86,8 +86,19 @@ def _process(a: dict, args, synced: set[int]) -> None:
     )
     try:
         notify.notify(subject, text, verbose=not args.quiet)
+        alerts.alert_once(None, key="delivery")  # delivered cleanly — re-arm
     except Exception as exc:
+        # The analysis is already saved to output/ and the activity is marked
+        # synced, so a failed send would otherwise vanish silently. Make a
+        # persistent delivery failure visible (de-duped so it pings once).
         print(f"  (delivery failed: {exc})")
+        alerts.alert_once(
+            f"delivery|{aid}|{exc!r}",
+            "Analysis couldn't be delivered",
+            f"Activity {aid}: the analysis was generated and saved to output/, "
+            f"but delivery failed after retries: {exc!r}",
+            key="delivery",
+        )
     print()
 
 

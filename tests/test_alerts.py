@@ -62,3 +62,17 @@ def test_alert_once_clear_rearms(sent):
 def test_alert_once_clear_with_no_state_is_noop(sent):
     alerts.alert_once(None)
     assert sent == []
+
+
+def test_alert_once_namespaces_by_key(sent):
+    # Same signature under different keys alerts independently...
+    alerts.alert_once("s", "run failure", "b", key="run")
+    alerts.alert_once("s", "delivery failure", "b", key="delivery")
+    assert sent == ["run failure", "delivery failure"]
+    # ...but a repeat under the same key is still de-duped...
+    alerts.alert_once("s", "run again", "b", key="run")
+    assert sent == ["run failure", "delivery failure"]
+    # ...and clearing one key leaves the other's dedup intact.
+    alerts.alert_once(None, key="run")
+    alerts.alert_once("s", "delivery repeat", "b", key="delivery")
+    assert sent == ["run failure", "delivery failure"]
