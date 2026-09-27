@@ -40,7 +40,10 @@ def retrying_session(total: int = 4, backoff_factor: float = 0.5) -> requests.Se
         read=total,
         status=total,
         backoff_factor=backoff_factor,
-        status_forcelist=(429, 500, 502, 503, 504),
+        # Standard transient codes plus non-standard CDN/proxy timeout codes
+        # (520-524, 597-599) — observed in production from Strava's edge, and
+        # safe to retry on the idempotent GETs we make.
+        status_forcelist=(408, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524, 597, 598, 599),
         allowed_methods=frozenset(["GET", "POST"]),
         respect_retry_after_header=True,
         raise_on_status=False,  # let the caller's raise_for_status() report the final error
