@@ -16,6 +16,9 @@ __pycache__/
 # Temp files from atomic writes (should be transient; ignored so a crashed
 # write can't leave personal data staged for commit).
 *.tmp
+
+# Scratch directory used by other tooling/chats that share this folder — never commit it.
+tmp/
 .venv/
 venv/
 
