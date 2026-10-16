@@ -76,3 +76,12 @@ def test_alert_once_namespaces_by_key(sent):
     alerts.alert_once(None, key="run")
     alerts.alert_once("s", "delivery repeat", "b", key="delivery")
     assert sent == ["run failure", "delivery failure"]
+
+
+def test_alert_once_dedupes_across_varying_request_ids(sent):
+    # The real-world bug: Anthropic auth errors embed a request_id that changes
+    # every call, which used to defeat dedup and re-alert every run. Same failure
+    # differing only in the req id must still ping once.
+    alerts.alert_once("activities|123:AuthError invalid x-api-key req_011Cg4yg", "fail", "b")
+    alerts.alert_once("activities|123:AuthError invalid x-api-key req_011Cg4z4", "fail again", "b")
+    assert sent == ["fail"]

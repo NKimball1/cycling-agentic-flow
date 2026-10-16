@@ -14,6 +14,7 @@ genuine break alerts again.
 from __future__ import annotations
 
 import json
+import re
 
 import config
 import net
@@ -85,11 +86,22 @@ def _load_state() -> dict:
         return {}
 
 
+# Tokens that vary every run even for the *same* underlying failure (API request
+# ids, timestamps). Stripped from a signature before dedup so a recurring error
+# whose text differs only here still pings once, not every run.
+_VOLATILE = re.compile(r"req_[0-9A-Za-z]+|\d{4}-\d{2}-\d{2}[T ][\d:.]+Z?")
+
+
+def _normalize_signature(sig: str) -> str:
+    return _VOLATILE.sub("~", sig)
+
+
 def alert_once(signature: str | None, subject: str = "", body: str = "", key: str = "default") -> None:
     """Alert only when `signature` differs from the last one alerted for `key`, so
     a failure that repeats every run pings you just once. Pass signature=None to
     clear that key after a clean run (re-arming future alerts). Different `key`s
-    are tracked independently."""
+    are tracked independently. Volatile tokens (request ids, timestamps) are
+    stripped before comparison so the same failure dedupes even when those vary."""
     state = _load_state()
     last = state.get(key)
     if signature is None:
@@ -97,6 +109,7 @@ def alert_once(signature: str | None, subject: str = "", body: str = "", key: st
             state[key] = None
             storage.write_json_atomic(_STATE_PATH, state)
         return
+    signature = _normalize_signature(signature)
     if signature == last:
         return  # same failure as last time — already told you
     send(subject, body)
